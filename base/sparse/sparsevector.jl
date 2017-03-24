@@ -25,6 +25,10 @@ end
 SparseVector(n::Integer, nzind::Vector{Ti}, nzval::Vector{Tv}) where {Tv,Ti} =
     SparseVector{Tv,Ti}(n, nzind, nzval)
 
+const AbstractSparseVectorUnion{T<:Number} =
+    Union{AbstractSparseVector{T},
+          SubArray{T,1,<:AbstractSparseArray,Tuple{Base.Slice{Base.OneTo{Int64}},Int64},false}}
+
 ### Basic properties
 
 length(x::SparseVector) = x.n
@@ -32,8 +36,22 @@ size(x::SparseVector) = (x.n,)
 nnz(x::SparseVector) = length(x.nzval)
 countnz(x::SparseVector) = countnz(x.nzval)
 count(x::SparseVector) = count(x.nzval)
+
 nonzeros(x::SparseVector) = x.nzval
+function nonzeros(x::SubArray{T,1,<:AbstractSparseArray,Tuple{Base.Slice{Base.OneTo{Int64}},Int64},false} where T)
+    rowidx, colidx = parentindexes(x)
+    A = parent(x)
+    @inbounds y = view(A.nzval, A.colptr[colidx]:A.colptr[colidx + 1] - 1)
+    return y
+end
+
 nonzeroinds(x::SparseVector) = x.nzind
+function nonzeroinds(x::SubArray{T,1,<:AbstractSparseArray,Tuple{Base.Slice{Base.OneTo{Int64}},Int64},false} where T)
+    rowidx, colidx = parentindexes(x)
+    A = parent(x)
+    @inbounds y = view(A.rowval, A.colptr[colidx]:A.colptr[colidx + 1] - 1)
+    return y
+end
 
 similar(x::SparseVector, Tv::Type=eltype(x)) = SparseVector(x.n, copy(x.nzind), Vector{Tv}(length(x.nzval)))
 function similar(x::SparseVector, ::Type{Tv}, ::Type{Ti}) where {Tv,Ti}
@@ -1404,7 +1422,7 @@ vecnorm(x::AbstractSparseVector, p::Real=2) = vecnorm(nonzeros(x), p)
 
 # axpy
 
-function LinAlg.axpy!(a::Number, x::AbstractSparseVector, y::StridedVector)
+function LinAlg.axpy!(a::Number, x::AbstractSparseVectorUnion, y::StridedVector)
     length(x) == length(y) || throw(DimensionMismatch())
     nzind = nonzeroinds(x)
     nzval = nonzeros(x)
@@ -1449,7 +1467,6 @@ broadcast(::typeof(*), a::Number, x::AbstractSparseVector) = a * x
 broadcast(::typeof(/), x::AbstractSparseVector, a::Number) = x / a
 
 # dot
-
 function dot(x::StridedVector{Tx}, y::AbstractSparseVector{Ty}) where {Tx<:Number,Ty<:Number}
     n = length(x)
     length(y) == n || throw(DimensionMismatch())
@@ -1468,7 +1485,7 @@ function dot(x::AbstractSparseVector{Tx}, y::AbstractVector{Ty}) where {Tx<:Numb
     nzind = nonzeroinds(x)
     nzval = nonzeros(x)
     s = zero(Tx) * zero(Ty)
-    for i = 1:length(nzind)
+    @inbounds for i = 1:length(nzind)
         s += conj(nzval[i]) * y[nzind[i]]
     end
     return s
@@ -1495,7 +1512,7 @@ function _spdot(f::Function,
     s
 end
 
-function dot(x::AbstractSparseVector{<:Number}, y::AbstractSparseVector{<:Number})
+function dot(x::AbstractSparseVectorUnion{<:Number}, y::AbstractSparseVectorUnion{<:Number})
     x === y && return sum(abs2, x)
     n = length(x)
     length(y) == n || throw(DimensionMismatch())
@@ -1512,6 +1529,19 @@ end
 
 
 ### BLAS-2 / dense A * sparse x -> dense y
+
+# lowrankupdate (BLAS.ger! like)
+function LinAlg.lowrankupdate!(A::StridedMatrix, x::StridedVector, y::AbstractSparseVectorUnion, α::Number = 1)
+    nzi = nonzeroinds(y)
+    nzv = nonzeros(y)
+    @inbounds for (j,v) in zip(nzi,nzv)
+        αv = α*v'
+        for i in indices(x, 1)
+            A[i,j] += x[i]*αv
+        end
+    end
+    return A
+end
 
 # A_mul_B
 
