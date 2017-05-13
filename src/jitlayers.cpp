@@ -162,6 +162,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level)
 #endif
 
     PM->add(createInstructionCombiningPass()); // Cleanup for scalarrepl.
+    PM->add(createJuliaMVPass());
     PM->add(createSROAPass());                 // Break up aggregate allocas
     PM->add(createInstructionCombiningPass()); // Cleanup for scalarrepl.
     PM->add(createJumpThreadingPass());        // Thread jumps.
