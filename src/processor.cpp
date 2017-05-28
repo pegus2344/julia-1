@@ -808,6 +808,105 @@ static constexpr size_t ncpu_names = sizeof(cpus) / sizeof(cpus[0]);
 
 }
 
+namespace ARM {
+enum class CPU : uint32_t {
+    generic = 0,
+
+    // ARM
+    // armv6l
+    arm_mpcore,
+    arm_1136j_s,
+    arm_1136jf_s,
+    arm_1156t2_s,
+    arm_1156t2f_s,
+    arm_1176jz_s,
+    arm_1176jzf_s,
+    arm_cortex_m0,
+    arm_cortex_m1,
+    // armv7ml
+    arm_cortex_m3,
+    arm_cortex_m4,
+    arm_cortex_m7,
+    // armv7l
+    arm_cortex_a5,
+    arm_cortex_a7,
+    arm_cortex_a8,
+    arm_cortex_a9,
+    arm_cortex_a12,
+    arm_cortex_a15,
+    arm_cortex_a17,
+    arm_cortex_r4,
+    arm_cortex_r5,
+    arm_cortex_r7,
+    arm_cortex_r8,
+    // armv8ml
+    arm_cortex_m23,
+    arm_cortex_m33,
+    // armv8l
+    arm_cortex_a32,
+    arm_cortex_r52,
+    // aarch64
+    arm_cortex_a35,
+    arm_cortex_a53,
+    arm_cortex_a57,
+    arm_cortex_a72,
+    arm_cortex_a73,
+
+    // Cavium
+    // aarch64
+    cavium_thunderx2t99p1,
+    cavium_thunderx,
+    cavium_thunderx88,
+    cavium_thunderx88p1,
+    cavium_thunderx81,
+    cavium_thunderx83,
+    cavium_thunderx2t99,
+
+    // NVIDIA
+    // aarch64
+    nvidia_denver1,
+    nvidia_denver2,
+
+    // AppliedMicro
+    // aarch64
+    apm_xgene1,
+    apm_xgene2,
+    apm_xgene3,
+
+    // Qualcomm
+    // armv7l
+    qualcomm_scorpion,
+    qualcomm_krait,
+    // aarch64
+    qualcomm_kyro,
+    qualcomm_falkor,
+
+    // Samsung
+    // aarch64
+    samsung_exynos_m1,
+    samsung_exynos_m2,
+    samsung_exynos_m3,
+
+    // Apple
+    // armv7l
+    apple_swift,
+    // aarch64
+    apple_cyclone,
+    apple_typhoon,
+    apple_twister,
+    apple_hurricane,
+
+    // Marvell
+    // armv7l
+    marvell_pj4,
+
+    // Intel
+    // armv7l
+    intel_3735d,
+};
+
+}
+
 #if defined(_CPU_X86_) || defined(_CPU_X86_64_)
 
 #include "processor_x86.cpp"
