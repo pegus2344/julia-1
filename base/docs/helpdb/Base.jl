@@ -790,15 +790,6 @@ array.
 select!
 
 """
-    randstring([rng,] len=8)
-
-Create a random ASCII string of length `len`, consisting of upper- and
-lower-case letters and the digits 0-9. The optional `rng` argument
-specifies a random number generator, see [Random Numbers](@ref).
-"""
-randstring
-
-"""
     Float64(x [, mode::RoundingMode])
 
 Create a Float64 from `x`. If `x` is not exactly representable then `mode` determines how
