@@ -862,6 +862,19 @@ static void emit_error(const std::string &txt, jl_codectx_t *ctx)
     builder.SetInsertPoint(cont);
 }
 
+static BasicBlock *emit_failBB(void (*failcodegen)(jl_cgval_t *, jl_codectx_t*), jl_cgval_t *argv, jl_codectx_t *ctx, const char *dbgname = "failBB")
+{
+    BasicBlock *currentblock = builder.GetInsertBlock();
+    BasicBlock::iterator insertpt = builder.GetInsertPoint();
+    BasicBlock *failBB = BasicBlock::Create(jl_LLVMContext, dbgname, ctx->f);
+    builder.SetInsertPoint(failBB);
+    failcodegen(argv, ctx);
+    builder.CreateUnreachable();
+    failBB = builder.GetInsertBlock();
+    builder.SetInsertPoint(currentblock, insertpt);
+    return failBB;
+}
+
 // DO NOT PASS IN A CONST CONDITION!
 static void error_unless(Value *cond, const std::string &msg, jl_codectx_t *ctx)
 {
@@ -908,6 +921,14 @@ static void raise_exception_unless(Value *cond, Value *exc, jl_codectx_t *ctx)
     builder.CreateCondBr(cond, passBB, failBB);
     builder.SetInsertPoint(failBB);
     raise_exception(exc, ctx, passBB);
+}
+
+static void raise_exception_unless(Value *cond, BasicBlock *failBB, jl_codectx_t *ctx)
+{
+    BasicBlock *passBB = BasicBlock::Create(jl_LLVMContext,"pass");
+    builder.CreateCondBr(cond, passBB, failBB);
+    ctx->f->getBasicBlockList().push_back(passBB);
+    builder.SetInsertPoint(passBB);
 }
 
 // DO NOT PASS IN A CONST CONDITION!
