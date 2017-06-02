@@ -774,6 +774,7 @@ void jl_get_builtin_hooks(void)
     jl_float64_type = (jl_datatype_t*)core("Float64");
     jl_floatingpoint_type = (jl_datatype_t*)core("AbstractFloat");
     jl_number_type = (jl_datatype_t*)core("Number");
+    jl_integer_type = (jl_datatype_t*)core("Integer");
     jl_signed_type = (jl_datatype_t*)core("Signed");
     jl_unsigned_type = (jl_datatype_t*)core("Unsigned");
 

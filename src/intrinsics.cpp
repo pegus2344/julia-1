@@ -592,6 +592,34 @@ static Value *generic_fpext(Type *to, Value *x, jl_codectx_t *ctx, BasicBlock *e
     return builder.CreateFPExt(x, to);
 }
 
+static void topbit_exception(jl_cgval_t *argv, jl_codectx_t *ctx)
+{
+    // jl_datatype_t * const jl_exc = jl_inexacterror_type;
+    // Type *lt = julia_type_to_llvm((jl_value_t*)jl_exc);
+    // Value *strct = emit_static_alloca(lt);
+    // mark_julia_slot(strct, (jl_value_t*)jl_exc, NULL, tbaa_stack);
+    jl_datatype_t * const jl_exc = jl_invalidvalueerror_type;
+    const jl_cgval_t &x = argv[0];
+    jl_cgval_t strct = emit_uninitialized_struct((jl_value_t*)jl_exc, ctx);
+    Value *addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                                    ConstantInt::get(T_size, jl_field_offset(jl_exc, 0)));
+    Value *funcsym = boxed(emit_expr((jl_value_t*)jl_symbol("check_top_bit"), ctx), ctx, false);
+    tbaa_decorate(strct.tbaa, builder.CreateStore(funcsym,
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                             ConstantInt::get(T_size, jl_field_offset(jl_exc, 1)));
+    Value *boxed_Integer_type = boxed(emit_expr((jl_value_t*)jl_integer_type, ctx), ctx, false);
+    tbaa_decorate(strct.tbaa, builder.CreateStore(boxed_Integer_type,
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    addr = builder.CreateGEP(data_pointer(strct, ctx, T_pint8),
+                             ConstantInt::get(T_size, jl_field_offset(jl_exc, 2)));
+    tbaa_decorate(strct.tbaa, builder.CreateStore(boxed(x, ctx, false),
+                                                  emit_bitcast(addr, T_ppjlvalue)));
+    mark_gc_use(strct);
+    builder.CreateCall(prepare_call(jlthrow_func), { strct.V });
+}
+
+
 static jl_cgval_t emit_runtime_pointerref(jl_cgval_t *argv, jl_codectx_t *ctx)
 {
     return emit_runtime_call(pointerref, argv, 3, ctx);
@@ -824,6 +852,19 @@ static jl_cgval_t emit_intrinsic(intrinsic f, jl_value_t **args, size_t nargs,
         return generic_cast(f, generic_fptrunc, noexception, argv, ctx, false, false);
     case fpext:
         return generic_cast(f, generic_fpext, noexception, argv, ctx, false, false);
+
+    case check_top_bit: {
+        // raise InexactError if argument's top bit is set
+        Type *xtyp = INTT(bitstype_to_llvm(argv[0].typ));
+        Value *x = emit_unbox(xtyp, argv[0], argv[0].typ);
+        raise_exception_if(
+                builder.CreateTrunc(
+                    builder.CreateLShr(x, ConstantInt::get(xtyp, xtyp->getPrimitiveSizeInBits() - 1)),
+                    T_int1),
+                literal_pointer_val(jl_inexact_exception), ctx);
+                // emit_failBB(topbit_exception, argv, ctx, "topbit_exception"), ctx);
+        return argv[0];
+    }
 
     case select_value: {
         Value *isfalse = emit_condition(argv[0], "select_value", ctx); // emit the first argument
@@ -1062,15 +1103,6 @@ static Value *emit_untyped_intrinsic(intrinsic f, Value **argvalues, size_t narg
         raise_exception_unless(builder.CreateICmpNE(y, ConstantInt::get(t, 0)),
                                literal_pointer_val(jl_diverror_exception), ctx);
         return builder.CreateURem(x, y);
-
-    case check_top_bit:
-        // raise InexactError if argument's top bit is set
-        raise_exception_if(
-                builder.CreateTrunc(
-                    builder.CreateLShr(x, ConstantInt::get(t, t->getPrimitiveSizeInBits() - 1)),
-                    T_int1),
-                literal_pointer_val(jl_inexact_exception), ctx);
-        return x;
 
     case eq_int:  *newtyp = jl_bool_type; return builder.CreateICmpEQ(x, y);
     case ne_int:  *newtyp = jl_bool_type; return builder.CreateICmpNE(x, y);

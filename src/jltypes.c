@@ -66,6 +66,7 @@ jl_datatype_t *jl_float64_type;
 jl_datatype_t *jl_floatingpoint_type;
 jl_datatype_t *jl_number_type;
 jl_unionall_t *jl_complex_type;
+jl_datatype_t *jl_integer_type;
 jl_datatype_t *jl_signed_type;
 jl_datatype_t *jl_unsigned_type;
 
