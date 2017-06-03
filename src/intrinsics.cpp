@@ -70,7 +70,6 @@ static void jl_init_intrinsic_functions_codegen(Module *m)
     float_func[trunc_llvm] = true;
     float_func[rint_llvm] = true;
     float_func[sqrt_llvm] = true;
-    float_func[sqrt_llvm_fast] = true;
 }
 
 extern "C"
@@ -1187,11 +1186,7 @@ static Value *emit_untyped_intrinsic(intrinsic f, Value **argvalues, size_t narg
         Value *rintintr = Intrinsic::getDeclaration(jl_Module, Intrinsic::rint, makeArrayRef(t));
         return builder.CreateCall(rintintr, x);
     }
-    case sqrt_llvm:
-        raise_exception_unless(builder.CreateFCmpUGE(x, ConstantFP::get(t, 0.0)),
-                               literal_pointer_val(jl_domain_exception), ctx);
-        // fall-through
-    case sqrt_llvm_fast: {
+    case sqrt_llvm: {
         Value *sqrtintr = Intrinsic::getDeclaration(jl_Module, Intrinsic::sqrt, makeArrayRef(t));
         return builder.CreateCall(sqrtintr, x);
     }
