@@ -420,9 +420,6 @@ add_tfunc(uitofp, 2, 2, bitcast_tfunc)
 add_tfunc(sitofp, 2, 2, bitcast_tfunc)
 add_tfunc(fptrunc, 2, 2, bitcast_tfunc)
 add_tfunc(fpext, 2, 2, bitcast_tfunc)
-    ## checked conversion ##
-add_tfunc(checked_trunc_sint, 2, 2, bitcast_tfunc)
-add_tfunc(checked_trunc_uint, 2, 2, bitcast_tfunc)
     ## arithmetic ##
 add_tfunc(neg_int, 1, 1, math_tfunc)
 add_tfunc(add_int, 2, 2, math_tfunc)
@@ -3390,8 +3387,6 @@ function is_pure_intrinsic(f::IntrinsicFunction)
     return !(f === Intrinsics.pointerref || # this one is volatile
              f === Intrinsics.pointerset || # this one is never effect-free
              f === Intrinsics.llvmcall ||   # this one is never effect-free
-             f === Intrinsics.checked_trunc_sint ||
-             f === Intrinsics.checked_trunc_uint ||
              f === Intrinsics.checked_sdiv_int ||
              f === Intrinsics.checked_udiv_int ||
              f === Intrinsics.checked_srem_int ||
