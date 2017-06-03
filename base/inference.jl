@@ -423,7 +423,6 @@ add_tfunc(fpext, 2, 2, bitcast_tfunc)
     ## checked conversion ##
 add_tfunc(checked_trunc_sint, 2, 2, bitcast_tfunc)
 add_tfunc(checked_trunc_uint, 2, 2, bitcast_tfunc)
-add_tfunc(check_top_bit, 1, 1, math_tfunc)
     ## arithmetic ##
 add_tfunc(neg_int, 1, 1, math_tfunc)
 add_tfunc(add_int, 2, 2, math_tfunc)
@@ -3398,7 +3397,6 @@ function is_pure_intrinsic(f::IntrinsicFunction)
              f === Intrinsics.checked_udiv_int ||
              f === Intrinsics.checked_srem_int ||
              f === Intrinsics.checked_urem_int ||
-             f === Intrinsics.check_top_bit ||
              f === Intrinsics.sqrt_llvm ||
              f === Intrinsics.cglobal)  # cglobal throws an error for symbol-not-found
 end

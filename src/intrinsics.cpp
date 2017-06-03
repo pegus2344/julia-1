@@ -1036,15 +1036,6 @@ static Value *emit_untyped_intrinsic(intrinsic f, Value **argvalues, size_t narg
                                literal_pointer_val(jl_diverror_exception), ctx);
         return builder.CreateURem(x, y);
 
-    case check_top_bit:
-        // raise InexactError if argument's top bit is set
-        raise_exception_if(
-                builder.CreateTrunc(
-                    builder.CreateLShr(x, ConstantInt::get(t, t->getPrimitiveSizeInBits() - 1)),
-                    T_int1),
-                literal_pointer_val(jl_inexact_exception), ctx);
-        return x;
-
     case eq_int:  *newtyp = jl_bool_type; return builder.CreateICmpEQ(x, y);
     case ne_int:  *newtyp = jl_bool_type; return builder.CreateICmpNE(x, y);
     case slt_int: *newtyp = jl_bool_type; return builder.CreateICmpSLT(x, y);
