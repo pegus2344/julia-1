@@ -242,6 +242,7 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level)
     PM->add(createLateLowerGCFramePass());
     PM->add(createLowerPTLSPass(imaging_mode));
 #endif
+    PM->add(createCombineMulAddPass());
 }
 
 // ------------------------ TEMPORARILY COPIED FROM LLVM -----------------

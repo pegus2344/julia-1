@@ -212,6 +212,7 @@ extern ExecutionEngine *jl_ExecutionEngine;
 JL_DLLEXPORT extern LLVMContext jl_LLVMContext;
 
 Pass *createLowerPTLSPass(bool imaging_mode);
+Pass *createCombineMulAddPass();
 Pass *createLateLowerGCFramePass();
 Pass *createLowerExcHandlersPass();
 Pass *createGCInvariantVerifierPass(bool Strong);
