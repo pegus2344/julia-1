@@ -1315,6 +1315,9 @@ export
     nzrange,
     nnz,
 
+# Algorithms module re-exports
+    replace!,
+
 # Distributed module re-exports
     @spawn,
     @spawnat,
