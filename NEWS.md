@@ -110,6 +110,9 @@ Deprecated or removed
     implementations is now in AbstractFFTs.jl, the bindings to the FFTW library are in FFTW.jl,
     and the Base signal processing functions which used FFTs are now in DSP.jl ([#21956]).
 
+  * The method `replace(s::AbstractString, pat, r, count)` with `count <= 0` is deprecated
+    in favor of `replace(s::AbstractString, pat, r, typemax(Int))` ([#22325]).
+
 
 Julia v0.6.0 Release Notes
 ==========================
