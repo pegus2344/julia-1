@@ -3,7 +3,7 @@ module Algorithms
 export replace!, replace
 
 import Base: replace
-
+using Base: Callable
 
 """
     replace!(pred, [f::Function], A, [new], [count])
@@ -43,7 +43,7 @@ julia> replace!(x->true, x->2x, Set([3, 6]))
 Set([12])
 ```
 """
-function replace!(pred, new::Function, A::AbstractArray, n::Integer=-1)
+function replace!(pred::Callable, new::Callable, A::AbstractArray, n::Integer=-1)
     n == 0 && return A
     count = 0
     @inbounds for i in eachindex(A)
@@ -59,7 +59,7 @@ end
 askey(k, ::Associative) = k.first
 askey(k, ::AbstractSet) = k
 
-function replace!(pred, new::Function, A::Union{Associative,AbstractSet}, n::Integer=-1)
+function replace!(pred::Callable, new::Callable, A::Union{Associative,AbstractSet}, n::Integer=-1)
     n == 0 && return A
     del = eltype(A)[]
     count = 0
@@ -77,12 +77,10 @@ function replace!(pred, new::Function, A::Union{Associative,AbstractSet}, n::Int
     A
 end
 
-const ReplaceCollection = Union{AbstractArray,Associative,AbstractSet}
-
-replace!(pred, A::ReplaceCollection, new, n::Integer=-1) = replace!(pred, y->new, A, n)
+replace!(pred::Callable, A, new, n::Integer=-1) = replace!(pred, y->new, A, n)
 
 """
-    replace(pred, [f::Function], A, [new], [count])
+    replace(pred, [f::Callable], A, [new], [count])
 
 Return a copy of collection `A` where all occurrences `x` for which
 `pred(x)` is true are replaced by `new` or `f(x)` (exactly one among
@@ -90,8 +88,8 @@ Return a copy of collection `A` where all occurrences `x` for which
 If `count` is given, then replace at most `count` occurrences.
 See the in-place version [`replace!`](@ref) for examples.
 """
-replace(pred, new::Function, A::ReplaceCollection, n::Integer=-1) = replace!(pred, new, copy(A), n)
-replace(pred, A::ReplaceCollection, new, n::Integer=-1) = replace!(pred, copy(A), new, n)
+replace(pred::Callable, new::Callable, A, n::Integer=-1) = replace!(pred, new, copy(A), n)
+replace(pred::Callable, A, new, n::Integer=-1) = replace!(pred, copy(A), new, n)
 
 """
     replace!(A, old, new, [count])
@@ -105,7 +103,7 @@ julia> replace!(Set([1, 2, 3]), 1, 0)
 Set([0, 2, 3])
 ```
 """
-replace!(A::ReplaceCollection, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
+replace!(A, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
 
 """
     replace(A, old, new, [count])
@@ -114,6 +112,6 @@ Return a copy of collection `A` where all occurrences of `old` are
 replaced by `new`.
 If `count` is given, then replace at most `count` occurrences.
 """
-replace(A::ReplaceCollection, old, new, n::Integer=-1) = replace!(copy(A), old, new, n)
+replace(A, old, new, n::Integer=-1) = replace!(copy(A), old, new, n)
 
 end
