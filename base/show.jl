@@ -127,7 +127,7 @@ function show_default(io::IO, x::ANY)
     t = typeof(x)::DataType
     show(io, t)
     print(io, '(')
-    nf = nfields(t)
+    nf = nfields(x)
     nb = sizeof(x)
     if nf != 0 || nb == 0
         if !show_circular(io, x)
@@ -1186,7 +1186,7 @@ function dump(io::IO, x::ANY, n::Int, indent)
     else
         print(io, T)
     end
-    if nfields(T) > 0
+    if nfields(x) > 0
         if n > 0
             for field in (isa(x,Tuple) ? (1:length(x)) : fieldnames(T))
                 println(io)
@@ -1259,12 +1259,14 @@ function dump(io::IO, x::DataType, n::Int, indent)
                 tvar_io = IOContext(tvar_io, :unionall_env => tparam)
             end
         end
-        fields = fieldnames(x)
-        fieldtypes = x.types
-        for idx in 1:length(fields)
-            println(io)
-            print(io, indent, "  ", fields[idx], "::")
-            print(tvar_io, fieldtypes[idx])
+        if !x.abstract
+            fields = fieldnames(x)
+            fieldtypes = x.types
+            for idx in 1:length(fields)
+                println(io)
+                print(io, indent, "  ", fields[idx], "::")
+                print(tvar_io, fieldtypes[idx])
+            end
         end
     end
     nothing

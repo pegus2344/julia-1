@@ -1150,7 +1150,7 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
         jl_gc_wb(ndt, ndt->super);
     }
     jl_svec_t *ftypes = dt->types;
-    if (!istuple && ndt->name->names == jl_emptysvec) {
+    if (!istuple && jl_field_names(ndt) == jl_emptysvec) {
         assert(ftypes == NULL || ftypes == jl_emptysvec);
         ndt->size = dt->size;
         ndt->layout = dt->layout;
@@ -1183,7 +1183,7 @@ static jl_value_t *inst_datatype(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **i
             }
         }
         else {
-            assert(ndt->name->names == jl_emptysvec);
+            assert(jl_field_names(ndt) == jl_emptysvec);
         }
     }
     if (istuple)
@@ -1489,7 +1489,7 @@ void jl_reinstantiate_inner_types(jl_datatype_t *t) // can throw!
         jl_gc_wb(ndt, ndt->super);
     }
 
-    if (t->name->names != jl_emptysvec) {
+    if (t->types != jl_emptysvec) {
         for (j = 0; j < partial_inst.len; j++) {
             jl_datatype_t *ndt = (jl_datatype_t*)partial_inst.items[j];
             for (i = 0; i < n; i++)
@@ -1512,7 +1512,7 @@ void jl_reinstantiate_inner_types(jl_datatype_t *t) // can throw!
         }
     }
     else {
-        assert(t->types == jl_emptysvec);
+        assert(jl_field_names(t) == jl_emptysvec);
     }
     partial_inst.len = 0;
 }

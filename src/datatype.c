@@ -689,7 +689,7 @@ JL_DLLEXPORT jl_value_t *jl_new_struct_uninit(jl_datatype_t *type)
 
 JL_DLLEXPORT int jl_field_index(jl_datatype_t *t, jl_sym_t *fld, int err)
 {
-    jl_svec_t *fn = t->name->names;
+    jl_svec_t *fn = jl_field_names(t);
     for(size_t i=0; i < jl_svec_len(fn); i++) {
         if (jl_svecref(fn,i) == (jl_value_t*)fld) {
             return (int)i;

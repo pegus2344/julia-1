@@ -618,7 +618,7 @@ JL_DLLEXPORT jl_datatype_t *jl_first_argument_datatype(jl_value_t *argtypes)
 }
 
 // get DataType implied by a single given type
-jl_datatype_t *jl_argument_datatype(jl_value_t *argt)
+JL_DLLEXPORT jl_datatype_t *jl_argument_datatype(jl_value_t *argt)
 {
     return first_arg_datatype(argt, 1);
 }

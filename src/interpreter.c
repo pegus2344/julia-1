@@ -102,7 +102,7 @@ static int equiv_type(jl_datatype_t *dta, jl_datatype_t *dtb)
           dta->mutabl == dtb->mutabl &&
           dta->size == dtb->size &&
           dta->ninitialized == dtb->ninitialized &&
-          jl_egal((jl_value_t*)dta->name->names, (jl_value_t*)dtb->name->names) &&
+          jl_egal((jl_value_t*)jl_field_names(dta), (jl_value_t*)jl_field_names(dtb)) &&
           jl_nparams(dta) == jl_nparams(dtb) &&
           jl_field_count(dta) == jl_field_count(dtb)))
         return 0;

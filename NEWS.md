@@ -110,6 +110,12 @@ Deprecated or removed
     implementations is now in AbstractFFTs.jl, the bindings to the FFTW library are in FFTW.jl,
     and the Base signal processing functions which used FFTs are now in DSP.jl ([#21956]).
 
+  * Calling `nfields` on a type to find out how many fields its instances have is deprecated.
+    Use `fieldcount` instead. Use `nfields` only to get the number of fields in a specific object ([#22350]).
+
+  * `fieldnames` now operates only on types. To get the names of fields in an object, use
+    `fieldnames(typeof(x))` ([#22350]).
+
 
 Julia v0.6.0 Release Notes
 ==========================

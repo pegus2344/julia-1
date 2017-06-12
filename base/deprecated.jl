@@ -1485,6 +1485,8 @@ end
 using .DSP
 export conv, conv2, deconv, filt, filt!, xcorr
 
+@deprecate fieldnames(v) fieldnames(typeof(v))
+
 # END 0.7 deprecations
 
 # BEGIN 1.0 deprecations

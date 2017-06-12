@@ -774,7 +774,14 @@ STATIC_INLINE void jl_array_uint8_set(void *a, size_t i, uint8_t x)
 #define jl_gf_name(f)   (jl_gf_mtable(f)->name)
 
 // struct type info
-#define jl_field_name(st,i)    (jl_sym_t*)jl_svecref(((jl_datatype_t*)st)->name->names, (i))
+STATIC_INLINE jl_svec_t *jl_field_names(jl_datatype_t *st)
+{
+    return st->name->names;
+}
+STATIC_INLINE jl_sym_t *jl_field_name(jl_datatype_t *st, size_t i)
+{
+    return (jl_sym_t*)jl_svecref(jl_field_names(st), i);
+}
 #define jl_field_type(st,i)    jl_svecref(((jl_datatype_t*)st)->types, (i))
 #define jl_field_count(st)     jl_svec_len(((jl_datatype_t*)st)->types)
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
@@ -919,7 +926,7 @@ STATIC_INLINE int jl_is_datatype_singleton(jl_datatype_t *d)
 STATIC_INLINE int jl_is_datatype_make_singleton(jl_datatype_t *d)
 {
     return (!d->abstract && jl_datatype_size(d) == 0 && d != jl_sym_type && d->name != jl_array_typename &&
-            d->uid != 0 && (d->name->names == jl_emptysvec || !d->mutabl));
+            d->uid != 0 && (jl_datatype_nfields(d) == 0 || !d->mutabl));
 }
 
 STATIC_INLINE int jl_is_abstracttype(void *v)
