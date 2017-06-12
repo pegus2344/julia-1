@@ -1490,7 +1490,7 @@ export conv, conv2, deconv, filt, filt!, xcorr
 function replace(s::AbstractString, pat, f, n::Integer)
     if n <= 0
         depwarn(string("`replace(s, pat, r, count)` with `count <= 0` is deprecated, use ",
-                       "`replace(s, pat, r, typemax(Int))` or replace(s, pat, r)` instead"),
+                       "`replace(s, pat, r, typemax(Int))` or `replace(s, pat, r)` instead"),
                 :replace)
         replace(s, pat, f)
     else
