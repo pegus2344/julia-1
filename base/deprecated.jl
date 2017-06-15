@@ -1485,8 +1485,11 @@ end
 using .DSP
 export conv, conv2, deconv, filt, filt!, xcorr
 
-# NOTE: rename the function replace_new from strings/util.jl to replace
-# when this replace is removed from deprecated.jl
+# PR #22325
+# TODO: when this replace is removed from deprecated.jl:
+# 1) rename the function replace_new from strings/util.jl to replace
+# 2) update the replace(s::AbstractString, pat, f) method, below replace_new
+#    (see instructions there)
 function replace(s::AbstractString, pat, f, n::Integer)
     if n <= 0
         depwarn(string("`replace(s, pat, r, count)` with `count <= 0` is deprecated, use ",
