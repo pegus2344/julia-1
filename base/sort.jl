@@ -58,7 +58,7 @@ function issorted(itr, order::Ordering)
 end
 
 """
-    issorted(v, lt=isless, by=identity, rev:Bool=false, order::Ordering=Forward)
+    issorted(v; lt=isless, by=identity, rev::Bool=false)
 
 Test whether a vector is in sorted order. The `lt`, `by` and `rev` keywords modify what
 order is considered to be sorted just as they do for [`sort`](@ref).
@@ -77,9 +77,8 @@ julia> issorted([(1, "b"), (2, "a")], by = x -> x[2], rev=true)
 true
 ```
 """
-issorted(itr;
-    lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
-    issorted(itr, ord(lt,by,rev,order))
+issorted(itr; lt=isless, by=identity, rev::Bool=false) =
+    issorted(itr, ord(lt, by, rev))
 
 function select!(v::AbstractVector, k::Union{Int,OrdinalRange}, o::Ordering)
     inds = indices(v, 1)
@@ -87,8 +86,8 @@ function select!(v::AbstractVector, k::Union{Int,OrdinalRange}, o::Ordering)
     v[k]
 end
 select!(v::AbstractVector, k::Union{Int,OrdinalRange};
-    lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
-    select!(v, k, ord(lt,by,rev,order))
+        lt=isless, by=identity, rev::Bool=false) =
+        select!(v, k, ord(lt, by, rev))
 
 select(v::AbstractVector, k::Union{Int,OrdinalRange}; kws...) = select!(copymutable(v), k; kws...)
 
@@ -211,9 +210,8 @@ searchsorted(a::Range{<:Real}, x::Real, o::DirectOrdering) =
 for s in [:searchsortedfirst, :searchsortedlast, :searchsorted]
     @eval begin
         $s(v::AbstractVector, x, o::Ordering) = (inds = indices(v, 1); $s(v,x,first(inds),last(inds),o))
-        $s(v::AbstractVector, x;
-           lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
-            $s(v,x,ord(lt,by,rev,order))
+        $s(v::AbstractVector, x; lt=isless, by=identity, rev::Bool=false) =
+            $s(v,x,ord(lt, by, rev))
         $s(v::AbstractVector, x) = $s(v, x, Forward)
     end
 end
@@ -436,7 +434,7 @@ function sort!(v::AbstractVector, alg::Algorithm, order::Ordering)
 end
 
 """
-    sort!(v; alg::Algorithm=defalg(v), lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
+    sort!(v; alg::Algorithm=defalg(v), lt=isless, by=identity, rev::Bool=false)
 
 Sort the vector `v` in place. `QuickSort` is used by default for numeric arrays while
 `MergeSort` is used for other arrays. You can specify an algorithm to use via the `alg`
@@ -477,9 +475,8 @@ function sort!(v::AbstractVector;
                alg::Algorithm=defalg(v),
                lt=isless,
                by=identity,
-               rev::Bool=false,
-               order::Ordering=Forward)
-    ordr = ord(lt,by,rev,order)
+               rev::Bool=false)
+    ordr = ord(lt, by, rev)
     if ordr === Forward && isa(v,Vector) && eltype(v)<:Integer
         n = _length(v)
         if n > 1
@@ -518,7 +515,7 @@ function sort_int_range!(x::Vector{<:Integer}, rangelen, minval)
 end
 
 """
-    sort(v; alg::Algorithm=defalg(v), lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
+    sort(v; alg::Algorithm=defalg(v), lt=isless, by=identity, rev::Bool=false)
 
 Variant of [`sort!`](@ref) that returns a sorted copy of `v` leaving `v` itself unmodified.
 
@@ -550,7 +547,6 @@ function selectperm!(ix::AbstractVector{<:Integer}, v::AbstractVector,
                      lt::Function=isless,
                      by::Function=identity,
                      rev::Bool=false,
-                     order::Ordering=Forward,
                      initialized::Bool=false)
     if !initialized
         @inbounds for i = indices(ix,1)
@@ -559,14 +555,14 @@ function selectperm!(ix::AbstractVector{<:Integer}, v::AbstractVector,
     end
 
     # do partial quicksort
-    sort!(ix, PartialQuickSort(k), Perm(ord(lt, by, rev, order), v))
+    sort!(ix, PartialQuickSort(k), Perm(ord(lt, by, rev), v))
     return ix[k]
 end
 
 ## sortperm: the permutation to sort an array ##
 
 """
-    sortperm(v; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
+    sortperm(v; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false)
 
 Return a permutation vector of indices of `v` that puts it in sorted order. Specify `alg` to
 choose a particular sorting algorithm (see Sorting Algorithms). `MergeSort` is used by
@@ -621,7 +617,9 @@ end
 
 
 """
-    sortperm!(ix, v; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward, initialized::Bool=false)
+    sortperm!(ix, v;
+              alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity,
+              rev::Bool=false, initialized::Bool=false)
 
 Like [`sortperm`](@ref), but accepts a preallocated index vector `ix`.  If `initialized` is `false`
 (the default), `ix` is initialized to contain the values `1:length(v)`.
@@ -647,7 +645,6 @@ function sortperm!(x::AbstractVector{<:Integer}, v::AbstractVector;
                    lt=isless,
                    by=identity,
                    rev::Bool=false,
-                   order::Ordering=Forward,
                    initialized::Bool=false)
     if indices(x,1) != indices(v,1)
         throw(ArgumentError("index vector must have the same indices as the source vector, $(indices(x,1)) != $(indices(v,1))"))
@@ -657,7 +654,7 @@ function sortperm!(x::AbstractVector{<:Integer}, v::AbstractVector;
             x[i] = i
         end
     end
-    sort!(x, alg, Perm(ord(lt,by,rev,order),v))
+    sort!(x, alg, Perm(ord(lt, by, rev),v))
 end
 
 # sortperm for vectors of few unique integers
@@ -685,7 +682,7 @@ end
 ## sorting multi-dimensional arrays ##
 
 """
-    sort(A, dim::Integer; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward, initialized::Bool=false)
+    sort(A, dim::Integer; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false)
 
 Sort a multidimensional array `A` along the given dimension.
 See [`sort!`](@ref) for a description of possible
@@ -712,10 +709,8 @@ function sort(A::AbstractArray, dim::Integer;
               alg::Algorithm=DEFAULT_UNSTABLE,
               lt=isless,
               by=identity,
-              rev::Bool=false,
-              order::Ordering=Forward,
-              initialized::Bool=false)
-    order = ord(lt,by,rev,order)
+              rev::Bool=false)
+    order = ord(lt, by, rev)
     n = length(indices(A, dim))
     if dim != 1
         pdims = (dim, setdiff(1:ndims(A), dim)...)  # put the selected dimension first
@@ -740,7 +735,7 @@ end
 
 
 """
-    sortrows(A; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
+    sortrows(A; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false)
 
 Sort the rows of matrix `A` lexicographically.
 See [`sort!`](@ref) for a description of possible
@@ -780,7 +775,7 @@ function sortrows(A::AbstractMatrix; kws...)
 end
 
 """
-    sortcols(A; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
+    sortcols(A; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false)
 
 Sort the columns of matrix `A` lexicographically.
 See [`sort!`](@ref) for a description of possible
