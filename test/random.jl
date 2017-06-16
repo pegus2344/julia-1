@@ -543,3 +543,6 @@ let r = MersenneTwister(0)
     @inferred Base.Random.reserve_1(r)
     @inferred Base.Random.reserve(r, 1)
 end
+
+# this shouldn't crash (#22403)
+@test_throws MethodError rand!(Union{UInt,Int}[1, 2, 3]) isa Vector{Union{UInt,Int}}
