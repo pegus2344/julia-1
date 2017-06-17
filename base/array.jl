@@ -1988,15 +1988,40 @@ julia> symdiff([1,2,3],[3,4,5],[4,5,6])
 """
 symdiff(a, b, rest...) = symdiff(a, symdiff(b, rest...))
 
-## replace ##
+## replace/replace! ##
+
+# NOTE: to implement replace! and replace for a new type T, it's enough to define:
+# function replace!(pred::Callable, new::Callable, A::T, n::Integer=-1)
 
 """
-    replace!(pred, [f::Function], A, [new], [count])
+    replace!(A, old, new, [count])
+
+Replace all occurrences of `old` in collection `A` by `new`.
+If `count` is given, then replace at most `count` occurrences.
+
+# Examples
+```jldoctest
+julia> replace!([1, 2, 1, 3], 1, 0, 2)
+4-element Array{Int64,1}:
+ 0
+ 2
+ 0
+ 3
+
+julia> replace!(Set([1, 2, 3]), 1, 0)
+Set([0, 2, 3])
+```
+"""
+replace!(A, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
+
+"""
+    replace!(pred, A, new, [count])
+    replace!(pred, f::Function, A, [count])
 
 Replace all occurrences `x` in collection `A` for which `pred(x)` is true
-by `new` or `f(x)` (exactly one among `f` and `new` must be specified).
+by `new` or `f(x)`.
 If `count` is specified, then replace at most `count` occurrences.
-This is the in-place version of [`replace`](@ref).
+See also [`replace`](@ref).
 
 # Examples
 ```jldoctest
@@ -2009,19 +2034,18 @@ julia> replace!(isodd, a, 0, 2); a
  0
  1
 
-julia> replace!(x->x.first=>3, Dict(1=>2, 3=>4), 1) do (k, v)
-           v < 3
+julia> replace!(x->x.first=>3, Dict(1=>2, 3=>4), 1) do kv
+           first(kv) < 3
        end
-
 Dict{Int64,Int64} with 2 entries:
   3 => 4
   1 => 3
 ```
 
 !!! note
-When `A` is an `Associative` or `AbstractSet` collection, if
-there are collisions among old and newly created keys, the result
-can be unexpected:
+    When `A` is an `Associative` or `AbstractSet` collection, if
+    there are collisions among old and newly created keys, the result
+    can be unexpected:
 
 ```jldoctest
 julia> replace!(x->true, x->2x, Set([3, 6]))
@@ -2041,36 +2065,7 @@ function replace!(pred::Callable, new::Callable, A::AbstractArray, n::Integer=-1
     A
 end
 
-# NOTE: to implement replace! and replace for a new type T, it's enough to define:
-# function replace!(pred::Callable, new::Callable, A::T, n::Integer=-1)
-
 replace!(pred::Callable, A, new, n::Integer=-1) = replace!(pred, y->new, A, n)
-
-"""
-    replace(pred, [f::Callable], A, [new], [count])
-
-Return a copy of collection `A` where all occurrences `x` for which
-`pred(x)` is true are replaced by `new` or `f(x)` (exactly one among
-`f` and `new` must be specified).
-If `count` is given, then replace at most `count` occurrences.
-See the in-place version [`replace!`](@ref) for examples.
-"""
-replace(pred::Callable, new::Callable, A, n::Integer=-1) = replace!(pred, new, copy(A), n)
-replace(pred::Callable, A, new, n::Integer=-1) = replace!(pred, copy(A), new, n)
-
-"""
-    replace!(A, old, new, [count])
-
-Replace all occurrences of `old` in collection `A` by `new`.
-If `count` is given, then replace at most `count` occurrences.
-
-# Examples
-```jldoctest
-julia> replace!(Set([1, 2, 3]), 1, 0)
-Set([0, 2, 3])
-```
-"""
-replace!(A, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
 
 """
     replace(A, old, new, [count])
@@ -2078,5 +2073,35 @@ replace!(A, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
 Return a copy of collection `A` where all occurrences of `old` are
 replaced by `new`.
 If `count` is given, then replace at most `count` occurrences.
+See also [`replace!`](@ref).
 """
 replace(A, old, new, n::Integer=-1) = replace!(copy(A), old, new, n)
+
+"""
+    replace(pred, A, new, [count])
+    replace(pred, f::Callable, A, [count])
+
+Return a copy of collection `A` where all occurrences `x` for which
+`pred(x)` is true are replaced by `new` or `f(x)`.
+If `count` is specified, then replace at most `count` occurrences.
+
+# Examples
+```jldoctest
+julia> replace!(isodd, [1, 2, 3, 1], 0, 2)
+4-element Array{Int64,1}:
+ 0
+ 2
+ 0
+ 1
+
+julia> replace(x->x.first=>3, Dict(1=>2, 3=>4), 1) do kv
+           first(kv) < 3
+       end
+Dict{Int64,Int64} with 2 entries:
+  3 => 4
+  1 => 3
+```
+
+"""
+replace(pred::Callable, new::Callable, A, n::Integer=-1) = replace!(pred, new, copy(A), n)
+replace(pred::Callable, A, new, n::Integer=-1) = replace!(pred, copy(A), new, n)
