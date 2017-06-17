@@ -1998,6 +1998,7 @@ symdiff(a, b, rest...) = symdiff(a, symdiff(b, rest...))
 
 Replace all occurrences of `old` in collection `A` by `new`.
 If `count` is given, then replace at most `count` occurrences.
+See also [`replace`](@ref).
 
 # Examples
 ```jldoctest
@@ -2021,7 +2022,6 @@ replace!(A, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
 Replace all occurrences `x` in collection `A` for which `pred(x)` is true
 by `new` or `f(x)`.
 If `count` is specified, then replace at most `count` occurrences.
-See also [`replace`](@ref).
 
 # Examples
 ```jldoctest
