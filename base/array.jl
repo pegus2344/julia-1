@@ -2045,7 +2045,7 @@ Dict{Int64,Int64} with 2 entries:
 !!! note
     When `A` is an `Associative` or `AbstractSet` collection, if
     there are collisions among old and newly created keys, the result
-    can be unexpected:
+    depends on the iteration order (which can be undefined):
 
 ```jldoctest
 julia> replace!(x->true, x->2x, Set([3, 6]))
