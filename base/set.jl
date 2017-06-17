@@ -357,8 +357,8 @@ convert(::Type{Set{T}}, x::Set) where {T} = Set{T}(x)
 askey(k, ::Associative) = k.first
 askey(k, ::AbstractSet) = k
 
-function replace!(pred::Callable, new::Callable, A::Union{Associative,AbstractSet}, n::Integer=-1)
-    n == 0 && return A
+function _replace!(pred::Callable, new::Callable, A::Union{Associative,AbstractSet}, n::Int)
+    # precondition: n > 0
     del = eltype(A)[]
     count = 0
     for x in A

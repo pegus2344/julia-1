@@ -1991,13 +1991,13 @@ symdiff(a, b, rest...) = symdiff(a, symdiff(b, rest...))
 ## replace/replace! ##
 
 # NOTE: to implement replace! and replace for a new type T, it's enough to define:
-# function replace!(pred::Callable, new::Callable, A::T, n::Integer=-1)
+# function _replace!(pred::Callable, new::Callable, A::T, n::Int)
 
 """
-    replace!(A, old, new, [count])
+    replace!(A, old, new, [n::Integer])
 
 Replace all occurrences of `old` in collection `A` by `new`.
-If `count` is given, then replace at most `count` occurrences.
+If `n` is specified, then replace at most `n` occurrences.
 See also [`replace`](@ref).
 
 # Examples
@@ -2013,15 +2013,15 @@ julia> replace!(Set([1, 2, 3]), 1, 0)
 Set([0, 2, 3])
 ```
 """
-replace!(A, old, new, n::Integer=-1) = replace!(x->x==old, A, new, n)
+replace!(A, old, new, n::Integer=typemax(Int)) = replace!(x->x==old, A, new, n)
 
 """
-    replace!(pred, A, new, [count])
-    replace!(pred, f::Function, A, [count])
+    replace!(pred, A, new, [n::Integer])
+    replace!(pred, f::Function, A, [n::Integer])
 
 Replace all occurrences `x` in collection `A` for which `pred(x)` is true
 by `new` or `f(x)`.
-If `count` is specified, then replace at most `count` occurrences.
+If `n` is specified, then replace at most `n` occurrences.
 
 # Examples
 ```jldoctest
@@ -2052,8 +2052,14 @@ julia> replace!(x->true, x->2x, Set([3, 6]))
 Set([12])
 ```
 """
-function replace!(pred::Callable, new::Callable, A::AbstractArray, n::Integer=-1)
+function replace!(pred::Callable, new::Callable, A::AbstractArray, n::Integer=typemax(Int))
+    n < 0 && throw(DomainError())
     n == 0 && return A
+    _replace!(pred, new, A, clamp(n, 0, typemax(Int)))
+end
+
+function _replace!(pred::Callable, new::Callable, A::AbstractArray, n::Int)
+    # precondition: n > 0
     count = 0
     @inbounds for i in eachindex(A)
         if pred(A[i])
@@ -2065,25 +2071,25 @@ function replace!(pred::Callable, new::Callable, A::AbstractArray, n::Integer=-1
     A
 end
 
-replace!(pred::Callable, A, new, n::Integer=-1) = replace!(pred, y->new, A, n)
+replace!(pred::Callable, A, new, n::Integer=typemax(Int)) = replace!(pred, y->new, A, n)
 
 """
-    replace(A, old, new, [count])
+    replace(A, old, new, [n])
 
 Return a copy of collection `A` where all occurrences of `old` are
 replaced by `new`.
-If `count` is given, then replace at most `count` occurrences.
+If `n` is specified, then replace at most `n` occurrences.
 See also [`replace!`](@ref).
 """
-replace(A, old, new, n::Integer=-1) = replace!(copy(A), old, new, n)
+replace(A, old, new, n::Integer=typemax(Int)) = replace!(copy(A), old, new, n)
 
 """
-    replace(pred, A, new, [count])
-    replace(pred, f::Callable, A, [count])
+    replace(pred, A, new, [n])
+    replace(pred, f::Callable, A, [n])
 
 Return a copy of collection `A` where all occurrences `x` for which
 `pred(x)` is true are replaced by `new` or `f(x)`.
-If `count` is specified, then replace at most `count` occurrences.
+If `n` is specified, then replace at most `n` occurrences.
 
 # Examples
 ```jldoctest
@@ -2103,5 +2109,5 @@ Dict{Int64,Int64} with 2 entries:
 ```
 
 """
-replace(pred::Callable, new::Callable, A, n::Integer=-1) = replace!(pred, new, copy(A), n)
-replace(pred::Callable, A, new, n::Integer=-1) = replace!(pred, copy(A), new, n)
+replace(pred::Callable, new::Callable, A, n::Integer=typemax(Int)) = replace!(pred, new, copy(A), n)
+replace(pred::Callable, A, new, n::Integer=typemax(Int)) = replace!(pred, copy(A), new, n)
