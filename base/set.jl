@@ -351,3 +351,26 @@ end
 
 convert(::Type{Set{T}}, s::Set{T}) where {T} = s
 convert(::Type{Set{T}}, x::Set) where {T} = Set{T}(x)
+
+# replace!
+
+askey(k, ::Associative) = k.first
+askey(k, ::AbstractSet) = k
+
+function replace!(pred::Callable, new::Callable, A::Union{Associative,AbstractSet}, n::Integer=-1)
+    n == 0 && return A
+    del = eltype(A)[]
+    count = 0
+    for x in A
+        if pred(x)
+            push!(del, x)
+            count += 1
+            count == n && break
+        end
+    end
+    for k in del
+        pop!(A, askey(k, A))
+        push!(A, new(k))
+    end
+    A
+end
