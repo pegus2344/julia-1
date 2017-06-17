@@ -133,7 +133,8 @@ Base.collect(::Type, ::Any)
 Base.issubset(::Any, ::Any)
 Base.filter
 Base.filter!
-Base.replace
+Base.replace(A, old, new, n::Integer)
+Base.replace(pred::Base.Callable, new::Base.Callable, A, n::Integer)
 Base.replace!
 ```
 
