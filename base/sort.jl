@@ -45,7 +45,7 @@ export # not exported by Base
 
 ## functions requiring only ordering ##
 
-function issorted(itr, order::Ordering)
+@noinline function issorted(itr, order::Ordering)
     state = start(itr)
     done(itr,state) && return true
     prev, state = next(itr, state)
@@ -82,7 +82,7 @@ issorted(itr;
     lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward) =
     issorted(itr, ord(lt,by,rev,order))
 
-function select!(v::AbstractVector, k::Union{Int,OrdinalRange}, o::Ordering)
+@noinline function select!(v::AbstractVector, k::Union{Int,OrdinalRange}, o::Ordering)
     inds = indices(v, 1)
     sort!(v, first(inds), last(inds), PartialQuickSort(k), o)
     v[k]
@@ -99,7 +99,7 @@ select(v::AbstractVector, k::Union{Int,OrdinalRange}; kws...) = select!(copymuta
 
 # index of the first value of vector a that is greater than or equal to x;
 # returns length(v)+1 if x is greater than all values in v.
-function searchsortedfirst(v::AbstractVector, x, lo::Int, hi::Int, o::Ordering)
+@noinline function searchsortedfirst(v::AbstractVector, x, lo::Int, hi::Int, o::Ordering)
     lo = lo-1
     hi = hi+1
     @inbounds while lo < hi-1
@@ -115,7 +115,7 @@ end
 
 # index of the last value of vector a that is less than or equal to x;
 # returns 0 if x is less than all values of v.
-function searchsortedlast(v::AbstractVector, x, lo::Int, hi::Int, o::Ordering)
+@noinline function searchsortedlast(v::AbstractVector, x, lo::Int, hi::Int, o::Ordering)
     lo = lo-1
     hi = hi+1
     @inbounds while lo < hi-1
@@ -132,7 +132,7 @@ end
 # returns the range of indices of v equal to x
 # if v does not contain x, returns a 0-length range
 # indicating the insertion point of x
-function searchsorted(v::AbstractVector, x, ilo::Int, ihi::Int, o::Ordering)
+@noinline function searchsorted(v::AbstractVector, x, ilo::Int, ihi::Int, o::Ordering)
     lo = ilo-1
     hi = ihi+1
     @inbounds while lo < hi-1
@@ -497,7 +497,7 @@ end
 defalg(v::AbstractArray) = DEFAULT_STABLE
 defalg(v::AbstractArray{<:Number}) = DEFAULT_UNSTABLE
 
-function sort!(v::AbstractVector, alg::Algorithm, order::Ordering)
+@noinline function sort!(v::AbstractVector, alg::Algorithm, order::Ordering)
     inds = indices(v,1)
     sort!(v,first(inds),last(inds),alg,order)
 end
@@ -989,8 +989,8 @@ end
 fpsort!(v::AbstractVector, a::Sort.PartialQuickSort, o::Ordering) =
     sort!(v, first(indices(v,1)), last(indices(v,1)), a, o)
 
-sort!(v::AbstractVector{<:Floats}, a::Algorithm, o::DirectOrdering) = fpsort!(v,a,o)
-sort!(v::Vector{Int}, a::Algorithm, o::Perm{<:DirectOrdering,<:Vector{<:Floats}}) = fpsort!(v,a,o)
+@noinline sort!(v::AbstractVector{<:Floats}, a::Algorithm, o::DirectOrdering) = fpsort!(v,a,o)
+@noinline sort!(v::Vector{Int}, a::Algorithm, o::Perm{<:DirectOrdering,<:Vector{<:Floats}}) = fpsort!(v,a,o)
 
 end # module Sort.Float
 

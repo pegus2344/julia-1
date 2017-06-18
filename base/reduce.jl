@@ -174,7 +174,7 @@ foldr(op, itr) = mapfoldr(identity, op, itr)
 
 # This is a generic implementation of `mapreduce_impl()`,
 # certain `op` (e.g. `min` and `max`) may have their own specialized versions.
-function mapreduce_impl(f, op, A::AbstractArray, ifirst::Integer, ilast::Integer, blksize::Int=pairwise_blocksize(f, op))
+@noinline function mapreduce_impl(f, op, A::AbstractArray, ifirst::Integer, ilast::Integer, blksize::Int)
     if ifirst == ilast
         @inbounds a1 = A[ifirst]
         return r_promote(op, f(a1))
@@ -196,6 +196,9 @@ function mapreduce_impl(f, op, A::AbstractArray, ifirst::Integer, ilast::Integer
         return op(v1, v2)
     end
 end
+
+mapreduce_impl(f, op, A::AbstractArray, ifirst::Integer, ilast::Integer) =
+    mapreduce_impl(f, op, A, ifirst, ilast, pairwise_blocksize(f, op))
 
 """
     mapreduce(f, op, itr)
