@@ -1994,48 +1994,63 @@ symdiff(a, b, rest...) = symdiff(a, symdiff(b, rest...))
 # function _replace!(pred::Callable, new::Callable, A::T, n::Int)
 
 """
-    replace!(A, old, new, [n::Integer])
+    replace!(A, old_new::Pair...; [n::Integer])
 
-Replace all occurrences of `old` in collection `A` by `new`.
-If `n` is specified, then replace at most `n` occurrences.
+For each pair `old=>new` in `old_new`, replace all occurrences
+of `old` in collection `A` by `new`.
+If `n` is specified, then replace at most `n` occurrences in total.
 See also [`replace`](@ref).
 
 # Examples
 ```jldoctest
-julia> replace!([1, 2, 1, 3], 1, 0, 2)
+julia> replace!([1, 2, 1, 3], 1=>0, 2=>4, n=2)
 4-element Array{Int64,1}:
  0
- 2
- 0
+ 4
+ 1
  3
 
-julia> replace!(Set([1, 2, 3]), 1, 0)
+julia> replace!(Set([1, 2, 3]), 1=>0)
 Set([0, 2, 3])
 ```
 """
-replace!(A, old, new, n::Integer=typemax(Int)) = replace!(x->x==old, A, new, n)
+function replace!(A, old_new::Pair...; n::Integer=typemax(Int))
+    replace!(A, n=n) do x
+        for on in old_new
+            first(on) == x && return Nullable(last(on))
+        end
+        Nullable()
+    end
+end
 
 """
-    replace!(pred, A, new, [n::Integer])
-    replace!(pred, f::Function, A, [n::Integer])
+    replace!(pred::Function, A, new; [n::Integer])
 
 Replace all occurrences `x` in collection `A` for which `pred(x)` is true
-by `new` or `f(x)`.
-If `n` is specified, then replace at most `n` occurrences.
+by `new`.
 
 # Examples
 ```jldoctest
-julia> a = [1, 2, 3, 1];
+julia> A = [1, 2, 3, 1];
 
-julia> replace!(isodd, a, 0, 2); a
+julia> replace!(isodd, A, 0, n=2); a
 4-element Array{Int64,1}:
  0
  2
  0
  1
+```
 
-julia> replace!(x->x.first=>3, Dict(1=>2, 3=>4), 1) do kv
-           first(kv) < 3
+    replace!(prednew::Function, A; [n::Integer])
+
+For each value `x` in `A`, `prednew(x)` is called and must
+return a `Nullable` object. If it is not null, then the wrapped
+value will be used as a replacement for `x`.
+
+# Example
+```jldoctest
+julia> replace!(Dict(1=>2, 3=>4)) do kv
+           Nullable(first(kv)=>3, first(kv) < 3)
        end
 Dict{Int64,Int64} with 2 entries:
   3 => 4
@@ -2049,22 +2064,23 @@ Dict{Int64,Int64} with 2 entries:
     For example, the following may appear unexpected:
 
 ```jldoctest
-julia> replace!(x->true, x->2x, Set([3, 6]))
+julia> replace!(x->Nullable(2x), Set([3, 6]))
 Set([12])
 ```
 """
-function replace!(pred::Callable, new::Callable, A, n::Integer=typemax(Int))
+function replace!(prednew::Callable, A; n::Integer=typemax(Int))
     n < 0 && throw(DomainError())
     n == 0 && return A
-    _replace!(pred, new, A, clamp(n, 0, typemax(Int)))
+    _replace!(prednew, A, clamp(n, 0, typemax(Int)))
 end
 
-function _replace!(pred::Callable, new::Callable, A::AbstractArray, n::Int)
+function _replace!(prednew::Callable, A::AbstractArray, n::Int)
     # precondition: n > 0
     count = 0
     @inbounds for i in eachindex(A)
-        if pred(A[i])
-            A[i] = new(A[i])
+        y = prednew(A[i])
+        if !isnull(y)
+            A[i] = get(y)
             count += 1
             count == n && break
         end
@@ -2072,48 +2088,54 @@ function _replace!(pred::Callable, new::Callable, A::AbstractArray, n::Int)
     A
 end
 
-replace!(pred::Callable, A, new, n::Integer=typemax(Int)) = replace!(pred, y->new, A, n)
+replace!(pred::Callable, A, new; n::Integer=typemax(Int)) =
+    replace!(x->Nullable(new, pred(x)), A, n=n)
 
 """
-    replace(A, old, new, [n])
+    replace(A, old_new::Pair...; [n::Integer])
 
-Return a copy of collection `A` where all occurrences of `old` are
-replaced by `new`.
-If `n` is specified, then replace at most `n` occurrences.
+Return a copy of collection `A` where, for each pair `old=>new` in `old_new`,
+all occurrences of `old` are replaced by `new`.
+If `n` is specified, then replace at most `n` occurrences in total.
 See also [`replace!`](@ref).
 
 # Examples
 
 ```jldoctest
-julia> replace([1, 2, 1, 3], 1, 0, 2)
+julia> replace([1, 2, 1, 3], 1=>0, 2=>4; n=2)
 4-element Array{Int64,1}:
  0
- 2
- 0
+ 4
+ 1
  3
 ```
 """
-replace(A, old, new, n::Integer=typemax(Int)) = replace!(copy(A), old, new, n)
+replace(A, old_new::Pair...; n::Integer=typemax(Int)) = replace!(copy(A), old_new..., n=n)
 
 """
-    replace(pred, A, new, [n])
-    replace(pred, f::Callable, A, [n])
+    replace(pred::Function, A, new; [n::Integer])
 
 Return a copy of collection `A` where all occurrences `x` for which
-`pred(x)` is true are replaced by `new` or `f(x)`.
-If `n` is specified, then replace at most `n` occurrences.
+`pred(x)` is true are replaced by `new`.
 
-# Examples
+# Example
 ```jldoctest
-julia> replace(isodd, [1, 2, 3, 1], 0, 2)
+julia> replace(isodd, [1, 2, 3, 1], 0, n=2)
 4-element Array{Int64,1}:
  0
  2
  0
  1
+```
 
-julia> replace(x->x.first=>3, Dict(1=>2, 3=>4), 1) do kv
-           first(kv) < 3
+    replace(prednew::Function, A; [n::Integer])
+
+Return a copy of `A` where for each value `x` in `A`, `prednew(x)` is called
+and must return a `Nullable` object. If it is not null, then the wrapped
+value will be used as a replacement for `x`.
+
+julia> replace(Dict(1=>2, 3=>4)) do kv
+           Nullable(first(kv)=>3, first(kv) < 3)
        end
 Dict{Int64,Int64} with 2 entries:
   3 => 4
@@ -2121,5 +2143,5 @@ Dict{Int64,Int64} with 2 entries:
 ```
 
 """
-replace(pred::Callable, new::Callable, A, n::Integer=typemax(Int)) = replace!(pred, new, copy(A), n)
-replace(pred::Callable, A, new, n::Integer=typemax(Int)) = replace!(pred, copy(A), new, n)
+replace(prednew::Callable, A; n::Integer=typemax(Int)) = replace!(prednew, copy(A), n=n)
+replace(pred::Callable, A, new; n::Integer=typemax(Int)) = replace!(pred, copy(A), new, n=n)
