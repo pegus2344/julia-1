@@ -1999,7 +1999,7 @@ symdiff(a, b, rest...) = symdiff(a, symdiff(b, rest...))
 For each pair `old=>new` in `old_new`, replace all occurrences
 of `old` in collection `A` by `new`.
 If `n` is specified, then replace at most `n` occurrences in total.
-See also [`replace`](@ref).
+See also [`replace`](@ref replace(A, old_new::Pair...)).
 
 # Examples
 ```jldoctest
@@ -2014,13 +2014,13 @@ julia> replace!(Set([1, 2, 3]), 1=>0)
 Set([0, 2, 3])
 ```
 """
-function replace!(A, old_new::Pair...; n::Integer=typemax(Int))
-    replace!(A, n=n) do x
-        for on in old_new
-            first(on) == x && return Nullable(last(on))
-        end
-        Nullable()
+replace!(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(A, eltype(A), n, old_new...)
+
+_replace!(A, ::Type{K}, n::Integer, old_new::Pair...) where {K} = _replace!(A, n) do x
+    for on in old_new
+        first(on) == x && return Nullable{K}(last(on))
     end
+    Nullable{K}()
 end
 
 """
@@ -2068,14 +2068,14 @@ julia> replace!(x->Nullable(2x), Set([3, 6]))
 Set([12])
 ```
 """
-function replace!(prednew::Callable, A; n::Integer=typemax(Int))
-    n < 0 && throw(DomainError())
-    n == 0 && return A
-    _replace!(prednew, A, clamp(n, 0, typemax(Int)))
-end
+replace!(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, A, n)
+
+_replace(prednew::Callable, A::AbstractArray, n::Integer) =
+    _replace(prednew, A, clamp(n, typemin(Int), typemax(Int)) % Int)
 
 function _replace!(prednew::Callable, A::AbstractArray, n::Int)
-    # precondition: n > 0
+    n < 0 && throw(DomainError())
+    n == 0 && return A
     count = 0
     @inbounds for i in eachindex(A)
         y = prednew(A[i])
@@ -2089,7 +2089,7 @@ function _replace!(prednew::Callable, A::AbstractArray, n::Int)
 end
 
 replace!(pred::Callable, A, new; n::Integer=typemax(Int)) =
-    replace!(x->Nullable(new, pred(x)), A, n=n)
+    _replace!(x->Nullable(new, pred(x)), A, n)
 
 """
     replace(A, old_new::Pair...; [n::Integer])
@@ -2110,7 +2110,7 @@ julia> replace([1, 2, 1, 3], 1=>0, 2=>4; n=2)
  3
 ```
 """
-replace(A, old_new::Pair...; n::Integer=typemax(Int)) = replace!(copy(A), old_new..., n=n)
+replace(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(copy(A), eltype(A), n, old_new...)
 
 """
     replace(pred::Function, A, new; [n::Integer])
@@ -2143,5 +2143,6 @@ Dict{Int64,Int64} with 2 entries:
 ```
 
 """
-replace(prednew::Callable, A; n::Integer=typemax(Int)) = replace!(prednew, copy(A), n=n)
-replace(pred::Callable, A, new; n::Integer=typemax(Int)) = replace!(pred, copy(A), new, n=n)
+replace(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, copy(A), n)
+replace(pred::Callable, A, new; n::Integer=typemax(Int)) =
+    _replace!(x->Nullable(new, pred(x)), copy(A), n)
