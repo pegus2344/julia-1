@@ -2017,8 +2017,8 @@ Set([0, 2, 3])
 replace!(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(A, eltype(A), n, old_new...)
 
 _replace!(A, ::Type{K}, n::Integer, old_new::Pair...) where {K} = _replace!(A, n) do x
-    for on in old_new
-        first(on) == x && return Nullable{K}(last(on))
+    for o_n in old_new
+        first(o_n) == x && return Nullable{K}(last(o_n))
     end
     Nullable{K}()
 end
@@ -2033,7 +2033,7 @@ by `new`.
 ```jldoctest
 julia> A = [1, 2, 3, 1];
 
-julia> replace!(isodd, A, 0, n=2); a
+julia> replace!(isodd, A, 0, n=2)
 4-element Array{Int64,1}:
  0
  2
@@ -2070,7 +2070,7 @@ Set([12])
 """
 replace!(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, A, n)
 
-_replace(prednew::Callable, A::AbstractArray, n::Integer) =
+_replace(prednew::Callable, A, n::Integer) =
     _replace(prednew, A, clamp(n, typemin(Int), typemax(Int)) % Int)
 
 function _replace!(prednew::Callable, A::AbstractArray, n::Int)
@@ -2110,7 +2110,8 @@ julia> replace([1, 2, 1, 3], 1=>0, 2=>4; n=2)
  3
 ```
 """
-replace(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(copy(A), eltype(A), n, old_new...)
+replace(A, old_new::Pair...; n::Integer=typemax(Int)) =
+    _replace!(copy(A), eltype(A), n, old_new...)
 
 """
     replace(pred::Function, A, new; [n::Integer])

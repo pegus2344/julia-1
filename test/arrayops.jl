@@ -2157,12 +2157,13 @@ Base.:(==)(a::T11053, b::T11053) = a.a == b.a
     @test a == [1, 4, 3, 1]
     @test replace(a, 1=>0) == [0, 4, 3, 0]
     @test replace(a, 1=>0, n=1) == [0, 4, 3, 1]
-    @test replace!(a, 1=>2) == [2, 4, 3, 2]
+    @test replace!(a, 1=>2) === a
+    @test a == [2, 4, 3, 2]
 
     d = Dict(1=>2, 3=>4)
     @test replace(x->x.first > 2, d, 0=>0) == Dict(1=>2, 0=>0)
-    @test replace!(x->Nullable(x.first=>2*x.second, x.first > 2), d) ==
-        Dict(1=>2, 3=>8)
+    @test replace!(x->Nullable(x.first=>2*x.second, x.first > 2), d) === d
+    @test d == Dict(1=>2, 3=>8)
     @test replace(d, (3=>8)=>(0=>0)) == Dict(1=>2, 0=>0)
     @test replace!(d, (3=>8)=>(2=>2)) === d
     @test d == Dict(1=>2, 2=>2)
@@ -2173,7 +2174,8 @@ Base.:(==)(a::T11053, b::T11053) = a.a == b.a
     @test replace(x->Nullable(2x, x>1), s) == Set([1, 4, 6])
     @test replace(x->Nullable(2x, x>1), s, n=1) in [Set([1, 4, 3]), Set([1, 2, 6])]
     @test replace(s, 1=>4) == Set([2, 3, 4])
-    @test replace!(s, 1=>2) == Set([2, 3])
+    @test replace!(s, 1=>2) === s
+    @test s == Set([2, 3])
 
-    @test 0 ∉ replace([1, 2, 3], 1=>0, n=0) # count=0 --> no replacements
+    @test replace([1, 2], 1=>0, 2=>0, n=0) == [1, 2] # count=0 --> no replacements
 end
