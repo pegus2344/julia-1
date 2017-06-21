@@ -2147,3 +2147,10 @@ Dict{Int64,Int64} with 2 entries:
 replace(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, copy(A), n)
 replace(pred::Callable, A, new; n::Integer=typemax(Int)) =
     _replace!(x->Nullable(new, pred(x)), copy(A), n)
+
+# Handle ambiguities
+replace!(a::Union{Function, Type}, b::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b))
+replace!(a::Union{Function, Type}, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b, c))
+replace(a::Union{Function, Type}, b::Pair; n::Integer=-1) = throw(MethodError(replace, a, b))
+replace(a::Union{Function, Type}, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace, a, b, c))
+replace(a::AbstractString, b::Pair, c::Pair) = throw(MethodError(replace, a, b, c))
