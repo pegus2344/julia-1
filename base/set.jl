@@ -357,17 +357,17 @@ convert(::Type{Set{T}}, x::Set) where {T} = Set{T}(x)
 askey(k, ::Associative) = k.first
 askey(k, ::AbstractSet) = k
 
-function _replace!(prednew::Callable, A::Union{Associative,AbstractSet}, n::Int)
-    n < 0 && throw(DomainError())
-    n == 0 && return A
+function _replace!(prednew::Callable, A::Union{Associative,AbstractSet}, count::Int)
+    count < 0 && throw(DomainError())
+    count == 0 && return A
     repl = Pair{eltype(A),eltype(A)}[]
-    count = 0
+    c = 0
     for x in A
         y = prednew(x)
         if !isnull(y)
             push!(repl, x=>get(y))
-            count += 1
-            count == n && break
+            c += 1
+            c == count && break
         end
     end
     for oldnew in repl
