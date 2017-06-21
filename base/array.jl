@@ -2014,11 +2014,11 @@ julia> replace!(Set([1, 2, 3]), 1=>0)
 Set([0, 2, 3])
 ```
 """
-replace!(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(A, eltype(A), n, old_new...)
+replace!(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(A, eltype(A), n, old_new)
 
 # we use this wrapper because using directly eltype(A) as the type
 # parameter below for Nullable degrades performances
-function _replace!(A, ::Type{K}, n::Integer, old_new::Pair...) where {K}
+function _replace!(A, ::Type{K}, n::Integer, old_new #=::Pair...=#) where {K}
     @inline function prednew(x)
         for o_n in old_new
             first(o_n) == x && return Nullable{K}(last(o_n))
