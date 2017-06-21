@@ -2016,11 +2016,16 @@ Set([0, 2, 3])
 """
 replace!(A, old_new::Pair...; n::Integer=typemax(Int)) = _replace!(A, eltype(A), n, old_new...)
 
-_replace!(A, ::Type{K}, n::Integer, old_new::Pair...) where {K} = _replace!(A, n) do x
-    for o_n in old_new
-        first(o_n) == x && return Nullable{K}(last(o_n))
+# we use this wrapper because using directly eltype(A) as the type
+# parameter below for Nullable degrades performances
+function _replace!(A, ::Type{K}, n::Integer, old_new::Pair...) where {K}
+    @inline function prednew(x)
+        for o_n in old_new
+            first(o_n) == x && return Nullable{K}(last(o_n))
+        end
+        Nullable{K}()
     end
-    Nullable{K}()
+    _replace!(prednew, A, n)
 end
 
 """
@@ -2029,7 +2034,7 @@ end
 Replace all occurrences `x` in collection `A` for which `pred(x)` is true
 by `new`.
 
-# Examples
+# Example
 ```jldoctest
 julia> A = [1, 2, 3, 1];
 
@@ -2040,7 +2045,11 @@ julia> replace!(isodd, A, 0, n=2)
  0
  1
 ```
+"""
+replace!(pred::Callable, A, new; n::Integer=typemax(Int)) =
+    _replace!(x->Nullable(new, pred(x)), A, n)
 
+"""
     replace!(prednew::Function, A; [n::Integer])
 
 For each value `x` in `A`, `prednew(x)` is called and must
@@ -2073,6 +2082,8 @@ replace!(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, A, 
 _replace(prednew::Callable, A, n::Integer) =
     _replace(prednew, A, clamp(n, typemin(Int), typemax(Int)) % Int)
 
+# we use this _replace wrapper because otherwise the performances are
+# degraded when forwarding the keyword argument
 function _replace!(prednew::Callable, A::AbstractArray, n::Int)
     n < 0 && throw(DomainError())
     n == 0 && return A
@@ -2088,9 +2099,6 @@ function _replace!(prednew::Callable, A::AbstractArray, n::Int)
     A
 end
 
-replace!(pred::Callable, A, new; n::Integer=typemax(Int)) =
-    _replace!(x->Nullable(new, pred(x)), A, n)
-
 """
     replace(A, old_new::Pair...; [n::Integer])
 
@@ -2099,7 +2107,7 @@ all occurrences of `old` are replaced by `new`.
 If `n` is specified, then replace at most `n` occurrences in total.
 See also [`replace!`](@ref).
 
-# Examples
+# Example
 
 ```jldoctest
 julia> replace([1, 2, 1, 3], 1=>0, 2=>4; n=2)
@@ -2128,13 +2136,19 @@ julia> replace(isodd, [1, 2, 3, 1], 0, n=2)
  0
  1
 ```
+"""
+replace(pred::Callable, A, new; n::Integer=typemax(Int)) =
+    _replace!(x->Nullable(new, pred(x)), copy(A), n)
 
+"""
     replace(prednew::Function, A; [n::Integer])
 
 Return a copy of `A` where for each value `x` in `A`, `prednew(x)` is called
 and must return a `Nullable` object. If it is not null, then the wrapped
 value will be used as a replacement for `x`.
 
+# Example
+```
 julia> replace(Dict(1=>2, 3=>4)) do kv
            Nullable(first(kv)=>3, first(kv) < 3)
        end
@@ -2142,15 +2156,12 @@ Dict{Int64,Int64} with 2 entries:
   3 => 4
   1 => 3
 ```
-
 """
 replace(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, copy(A), n)
-replace(pred::Callable, A, new; n::Integer=typemax(Int)) =
-    _replace!(x->Nullable(new, pred(x)), copy(A), n)
 
 # Handle ambiguities
-replace!(a::Union{Function, Type}, b::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b))
-replace!(a::Union{Function, Type}, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b, c))
-replace(a::Union{Function, Type}, b::Pair; n::Integer=-1) = throw(MethodError(replace, a, b))
-replace(a::Union{Function, Type}, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace, a, b, c))
+replace!(a::Base.Callable, b::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b))
+replace!(a::Base.Callable, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b, c))
+replace(a::Base.Callable, b::Pair; n::Integer=-1) = throw(MethodError(replace, a, b))
+replace(a::Base.Callable, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace, a, b, c))
 replace(a::AbstractString, b::Pair, c::Pair) = throw(MethodError(replace, a, b, c))
