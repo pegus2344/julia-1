@@ -2119,7 +2119,7 @@ julia> replace([1, 2, 1, 3], 1=>0, 2=>4; n=2)
 ```
 """
 replace(A, old_new::Pair...; count::Integer=typemax(Int)) =
-    _replace!(copy(A), eltype(A), count, old_new...)
+    _replace!(copy(A), eltype(A), count, old_new)
 
 """
     replace(pred::Function, A, new; [count::Integer])
