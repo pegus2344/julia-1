@@ -2160,8 +2160,8 @@ Dict{Int64,Int64} with 2 entries:
 replace(prednew::Callable, A; n::Integer=typemax(Int)) = _replace!(prednew, copy(A), n)
 
 # Handle ambiguities
-replace!(a::Base.Callable, b::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b))
-replace!(a::Base.Callable, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b, c))
-replace(a::Base.Callable, b::Pair; n::Integer=-1) = throw(MethodError(replace, a, b))
-replace(a::Base.Callable, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace, a, b, c))
+replace!(a::Callable, b::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b))
+replace!(a::Callable, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace!, a, b, c))
+replace(a::Callable, b::Pair; n::Integer=-1) = throw(MethodError(replace, a, b))
+replace(a::Callable, b::Pair, c::Pair; n::Integer=-1) = throw(MethodError(replace, a, b, c))
 replace(a::AbstractString, b::Pair, c::Pair) = throw(MethodError(replace, a, b, c))
