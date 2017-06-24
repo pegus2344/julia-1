@@ -61,17 +61,17 @@ static jl_array_t *_new_array_(jl_value_t *atype, uint32_t ndims, size_t *dims,
             jl_error("invalid Array dimensions");
         nel = prod;
     }
-
+    int isunion = atype != NULL && jl_is_uniontype(jl_tparam0(atype));
     if (isunboxed) {
         wideint_t prod = (wideint_t)elsz * (wideint_t)nel;
         if (prod > (wideint_t) MAXINTVAL)
             jl_error("invalid Array size");
         tot = prod;
-        if (elsz == 1 && atype != NULL && !jl_is_uniontype(jl_tparam0(atype))) {
+        if (elsz == 1 && !isunion) {
             // extra byte for all julia allocated byte arrays
             tot++;
         }
-        if (atype != NULL && jl_is_uniontype(jl_tparam0(atype))) {
+        if (isunion) {
             tot += nel;
         }
     }
@@ -94,7 +94,7 @@ static jl_array_t *_new_array_(jl_value_t *atype, uint32_t ndims, size_t *dims,
         // No allocation or safepoint allowed after this
         a->flags.how = 0;
         data = (char*)a + doffs;
-        if ((tot > 0 && !isunboxed) || (atype != NULL && jl_is_uniontype(jl_tparam0(atype))))
+        if ((tot > 0 && !isunboxed) || isunion)
             memset(data, 0, tot);
     }
     else {
@@ -106,7 +106,7 @@ static jl_array_t *_new_array_(jl_value_t *atype, uint32_t ndims, size_t *dims,
         // No allocation or safepoint allowed after this
         a->flags.how = 2;
         jl_gc_track_malloced_array(ptls, a);
-        if (!isunboxed || (atype != NULL && jl_is_uniontype(jl_tparam0(atype))))
+        if (!isunboxed || isunion)
             memset(data, 0, tot);
     }
     a->flags.pooled = tsz <= GC_MAX_SZCLASS;
@@ -196,7 +196,7 @@ JL_DLLEXPORT jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data,
     if (!isboxed) {
         a->elsize = elsz;
         size_t oldelsz, oldal;
-        jl_islayout_inline(eltype, &oldelsz, &oldal);
+        jl_islayout_inline(jl_tparam0(jl_typeof(data)), &oldelsz, &oldal);
         jl_value_t *ownerty = jl_typeof(owner);
         size_t oldalign = (ownerty == (jl_value_t*)jl_string_type ? 1 : oldal);
         if (oldalign < align)
@@ -278,17 +278,17 @@ JL_DLLEXPORT jl_array_t *jl_ptr_to_array_1d(jl_value_t *atype, void *data,
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_array_t *a;
-    jl_value_t *el_type = jl_tparam0(atype);
+    jl_value_t *eltype = jl_tparam0(atype);
 
-    int isunboxed = jl_array_store_unboxed(el_type);
+    int isunboxed = jl_array_store_unboxed(eltype);
     size_t elsz;
     unsigned align;
-    if (isunboxed && jl_is_uniontype(el_type))
+    if (isunboxed && jl_is_uniontype(eltype))
         jl_exceptionf(jl_argumenterror_type,
                       "unsafe_wrap: unspecified layout for union element type");
     if (isunboxed) {
-        elsz = jl_datatype_size(el_type);
-        align = jl_datatype_align(el_type);
+        elsz = jl_datatype_size(eltype);
+        align = jl_datatype_align(eltype);
     }
     else {
         align = elsz = sizeof(void*);
@@ -344,17 +344,17 @@ JL_DLLEXPORT jl_array_t *jl_ptr_to_array(jl_value_t *atype, void *data,
     }
     if (__unlikely(ndims == 1))
         return jl_ptr_to_array_1d(atype, data, nel, own_buffer);
-    jl_value_t *el_type = jl_tparam0(atype);
+    jl_value_t *eltype = jl_tparam0(atype);
 
-    int isunboxed = jl_array_store_unboxed(el_type);
+    int isunboxed = jl_array_store_unboxed(eltype);
     size_t elsz;
     unsigned align;
-    if (isunboxed && jl_is_uniontype(el_type))
+    if (isunboxed && jl_is_uniontype(eltype))
         jl_exceptionf(jl_argumenterror_type,
                       "unsafe_wrap: unspecified layout for union element type");
     if (isunboxed) {
-        elsz = jl_datatype_size(el_type);
-        align = jl_datatype_align(el_type);
+        elsz = jl_datatype_size(eltype);
+        align = jl_datatype_align(eltype);
     }
     else {
         align = elsz = sizeof(void*);
@@ -487,21 +487,6 @@ JL_DLLEXPORT size_t jl_array_len_(jl_array_t *a)
     return l;
 }
 #endif
-
-static inline size_t jl_arraymaxsize(jl_array_t *a)
-{
-    return a->flags.ndims == 1 ? a->maxsize - (size_t)a->offset : a->length;
-}
-
-JL_DLLEXPORT int jl_offset(jl_array_t *a)
-{
-    return (int)a->offset;
-}
-
-JL_DLLEXPORT int jl_maxsize(jl_array_t *a)
-{
-    return (int)a->maxsize;
-}
 
 JL_DLLEXPORT jl_value_t *jl_arrayref(jl_array_t *a, size_t i)
 {
@@ -733,12 +718,13 @@ STATIC_INLINE void jl_array_grow_at_beg(jl_array_t *a, size_t idx, size_t inc,
     size_t nbinc = inc * elsz;
     char *data = (char*)a->data;
     char *newdata;
+    int isbitsunion = !a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)));
     if (a->offset >= inc) {
         newdata = data - nbinc;
         a->offset -= inc;
         if (idx > 0)
             memmove(newdata, data, idx * elsz);
-        if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+        if (isbitsunion) {
             memmove(data + n * elsz + idx + inc, data + n * elsz + idx, n - idx);
             memset(data + n * elsz + idx, 0, inc);
         }
@@ -757,7 +743,7 @@ STATIC_INLINE void jl_array_grow_at_beg(jl_array_t *a, size_t idx, size_t inc,
             newdata = (char*)a->data + newoffset * elsz;
             // We could use memcpy if resizing allocates a new buffer,
             // hopefully it's not a particularly important optimization.
-            if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+            if (isbitsunion) {
                 memmove(newdata + newnrows * elsz, data + n * elsz, idx);
                 memmove(newdata + newnrows * elsz + idx + inc, data + n * elsz + idx, n - idx);
                 memset(newdata + newnrows * elsz + idx, 0, inc);
@@ -774,7 +760,7 @@ STATIC_INLINE void jl_array_grow_at_beg(jl_array_t *a, size_t idx, size_t inc,
             newdata = data - oldoffsnb + a->offset * elsz;
             // We could use memcpy if resizing allocates a new buffer,
             // hopefully it's not a particularly important optimization.
-            if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+            if (isbitsunion) {
                 memmove(newdata + newnrows * elsz + idx + inc, data + n * elsz + idx, n - idx);
                 memset(newdata + newnrows * elsz + idx, 0, inc);
             }
@@ -811,7 +797,8 @@ STATIC_INLINE void jl_array_grow_at_end(jl_array_t *a, size_t idx,
     }
     size_t elsz = a->elsize;
     char *data = (char*)a->data;
-    size_t oldmaxsize = jl_arraymaxsize(a);
+    int isbitsunion = !a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)));
+    size_t oldmaxsize = jl_array_len(a);
     int has_gap = n > idx;
     size_t reqmaxsize = a->offset + n + inc;
     if (__unlikely(reqmaxsize > a->maxsize)) {
@@ -827,19 +814,19 @@ STATIC_INLINE void jl_array_grow_at_end(jl_array_t *a, size_t idx,
         char *newdata = (char*)a->data + a->offset * elsz;
         if (newbuf) {
             memcpy(newdata, data, nb1);
-            if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+            if (isbitsunion) {
                 memmove(newdata + (oldmaxsize + inc) * elsz, data + oldmaxsize * elsz, idx);
             }
             if (has_gap) {
                 memcpy(newdata + nb1 + nbinc, data + nb1, n * elsz - nb1);
-                if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+                if (isbitsunion) {
                     memmove(newdata + (oldmaxsize + inc) * elsz + idx + inc, data + oldmaxsize * elsz + idx, n - idx);
                     memset(newdata + (oldmaxsize + inc) * elsz + idx, 0, inc);
                 }
             }
         }
         else if (has_gap) {
-            if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+            if (isbitsunion) {
                 memmove(newdata + (oldmaxsize + inc) * elsz, newdata + oldmaxsize * elsz, idx);
                 memmove(newdata + (oldmaxsize + inc) * elsz + idx + inc, newdata + oldmaxsize * elsz + idx, n - idx);
                 memset(newdata + (oldmaxsize + inc) * elsz + idx, 0, inc);
@@ -850,7 +837,7 @@ STATIC_INLINE void jl_array_grow_at_end(jl_array_t *a, size_t idx,
     }
     else if (has_gap) {
         size_t nb1 = idx * elsz;
-        if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+        if (isbitsunion) {
             memmove(data + (n + inc) * elsz + idx + inc, data + n * elsz + idx, n - idx);
             memmove(data + (n + inc) * elsz, data + n * elsz, idx);
             memset(data +  (n + inc) * elsz + idx, 0, inc);
@@ -858,7 +845,7 @@ STATIC_INLINE void jl_array_grow_at_end(jl_array_t *a, size_t idx,
         memmove(data + nb1 + inc * elsz, data + nb1, n * elsz - nb1);
     }
     else {
-        if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+        if (isbitsunion) {
             memmove(data + (n + inc) * elsz, data + n * elsz, oldmaxsize);
             memset(data + (n + inc) * elsz + idx, 0, inc);
         }
@@ -921,6 +908,7 @@ STATIC_INLINE void jl_array_del_at_beg(jl_array_t *a, size_t idx, size_t dec,
     // assume inbounds, assume unshared
     size_t elsz = a->elsize;
     size_t offset = a->offset;
+    int isbitsunion = !a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)));
     offset += dec;
 #ifdef STORE_ARRAY_LEN
     a->length = n - dec;
@@ -935,17 +923,17 @@ STATIC_INLINE void jl_array_del_at_beg(jl_array_t *a, size_t idx, size_t dec,
         size_t nb1 = idx * elsz; // size in bytes of the first block
         size_t nbtotal = a->nrows * elsz; // size in bytes of the new array
         // Implicit '\0' for byte arrays
-        if (elsz == 1 && !jl_is_uniontype(jl_tparam0(jl_typeof(a))))
+        if (elsz == 1 && !isbitsunion)
             nbtotal++;
         if (idx > 0) {
             memmove(newdata, olddata, nb1);
-            if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+            if (isbitsunion) {
                 memmove(newdata + nbtotal, olddata + n * elsz, idx);
                 memset(newdata + nbtotal + idx, 0, dec);
             }
         }
         memmove(newdata + nb1, olddata + nb1 + nbdec, nbtotal - nb1);
-        if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+        if (isbitsunion) {
             memmove(newdata + nbtotal + idx, olddata + n * elsz + idx + dec, n - idx);
         }
         a->data = newdata;
@@ -953,7 +941,7 @@ STATIC_INLINE void jl_array_del_at_beg(jl_array_t *a, size_t idx, size_t dec,
     else {
         char *data = (char*)a->data;
         a->data = data + nbdec;
-        if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+        if (isbitsunion) {
             memmove(data + elsz * n, data + elsz * n + dec, n - dec);
         }
     }
@@ -967,21 +955,22 @@ STATIC_INLINE void jl_array_del_at_end(jl_array_t *a, size_t idx, size_t dec,
     // assume inbounds, assume unshared
     char *data = (char*)a->data;
     size_t elsz = a->elsize;
+    int isbitsunion = !a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)));
     size_t last = idx + dec;
     if (n > last) {
         memmove(data + idx * elsz, data + last * elsz, (n - last) * elsz);
-        if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+        if (isbitsunion) {
             memmove(data + n * elsz + idx, data + n * elsz + last, n - last);
         }
     }
     n -= dec;
-    if (elsz == 1 && !jl_is_uniontype(jl_tparam0(jl_typeof(a))))
+    if (elsz == 1 && !isbitsunion)
         data[n] = 0;
     a->nrows = n;
 #ifdef STORE_ARRAY_LEN
     a->length = n;
 #endif
-    if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a)))) {
+    if (isbitsunion) {
         memmove(data + n * elsz, data + (n + dec) * elsz, n);
     }
 }
@@ -1041,14 +1030,14 @@ JL_DLLEXPORT void jl_array_sizehint(jl_array_t *a, size_t sz)
 JL_DLLEXPORT jl_array_t *jl_array_copy(jl_array_t *ary)
 {
     size_t elsz = ary->elsize;
+    size_t len = jl_array_len(ary);
     jl_array_t *new_ary = _new_array_(jl_typeof(ary), jl_array_ndims(ary),
                                       &ary->nrows, !ary->flags.ptrarray, elsz);
-    memcpy(new_ary->data, ary->data, jl_array_len(ary) * elsz);
+    memcpy(new_ary->data, ary->data, len * elsz);
     // ensure union isbits arrays copy their selector bytes correctly
     if (!ary->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(ary)))) {
-        memcpy((char*)new_ary->data + jl_arraymaxsize(new_ary),
-               (char*)ary->data + jl_arraymaxsize(ary),
-               jl_array_len(ary));
+        memcpy((char*)new_ary->data + len * elsz,
+               (char*)ary->data + len * elsz, len);
     }
     return new_ary;
 }
@@ -1091,11 +1080,12 @@ static NOINLINE ssize_t jl_array_ptr_copy_backward(jl_value_t *owner,
 JL_DLLEXPORT void jl_array_ptr_copy(jl_array_t *dest, void **dest_p,
                                     jl_array_t *src, void **src_p, ssize_t n)
 {
+    // need to intercept union isbits arrays here since they're unboxed
     if (!src->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(src))) &&
         !dest->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(dest)))) {
         memcpy(dest_p, src_p, n * src->elsize);
-        memcpy((char*)dest->data + jl_arraymaxsize(dest) * dest->elsize,
-               (char*)src->data + jl_arraymaxsize(src) * src->elsize, n);
+        memcpy((char*)dest->data + jl_array_len(dest) * dest->elsize,
+               (char*)src->data + jl_array_len(src) * src->elsize, n);
         return;
     }
     assert(dest->flags.ptrarray && src->flags.ptrarray);

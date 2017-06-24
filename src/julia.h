@@ -1026,7 +1026,6 @@ JL_DLLEXPORT jl_datatype_t *jl_new_primitivetype(jl_value_t *name,
                                                  jl_svec_t *parameters, size_t nbits);
 jl_datatype_t *jl_new_abstracttype(jl_value_t *name, jl_module_t *module,
                                    jl_datatype_t *super, jl_svec_t *parameters);
-unsigned jl_union_isbits(jl_value_t *ty, size_t *nbytes, size_t *align);
 
 // constructors
 JL_DLLEXPORT jl_value_t *jl_new_bits(jl_value_t *bt, void *data);

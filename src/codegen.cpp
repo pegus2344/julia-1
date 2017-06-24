@@ -234,7 +234,6 @@ static MDNode *tbaa_arrayptr;       // The pointer inside a jl_array_t
 static MDNode *tbaa_arraysize;      // A size in a jl_array_t
 static MDNode *tbaa_arraylen;       // The len in a jl_array_t
 static MDNode *tbaa_arrayflags;     // The flags in a jl_array_t
-static MDNode *tbaa_arrayoffset;    // The offset in a jl_array_t
 static MDNode *tbaa_const;      // Memory that is immutable by the time LLVM can see it
 
 // Basic DITypes
@@ -6149,7 +6148,6 @@ static void init_julia_llvm_meta(void)
     tbaa_arraysize = tbaa_make_child("jtbaa_arraysize", tbaa_array_scalar).first;
     tbaa_arraylen = tbaa_make_child("jtbaa_arraylen", tbaa_array_scalar).first;
     tbaa_arrayflags = tbaa_make_child("jtbaa_arrayflags", tbaa_array_scalar).first;
-    tbaa_arrayoffset = tbaa_make_child("jtbaa_arrayoffset", tbaa_array_scalar).first;
     tbaa_const = tbaa_make_child("jtbaa_const", nullptr, true).first;
 }
 
@@ -6267,7 +6265,7 @@ static void init_julia_llvm_env(Module *m)
                   "Size of jl_array_flags_t is not the same as int16_t");
     Type *jl_array_llvmt =
         StructType::create(jl_LLVMContext,
-                           makeArrayRef(vaelts),
+                           ArrayRef<Type*>(vaelts,sizeof(vaelts)/sizeof(vaelts[0])),
                            "jl_array_t");
     jl_parray_llvmt = PointerType::get(jl_array_llvmt, 0);
 
