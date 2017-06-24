@@ -195,14 +195,19 @@ JL_DLLEXPORT jl_array_t *jl_reshape_array(jl_value_t *atype, jl_array_t *data,
     assert(isboxed == data->flags.ptrarray);
     if (!isboxed) {
         a->elsize = elsz;
-        size_t oldelsz, oldal;
-        jl_islayout_inline(jl_tparam0(jl_typeof(data)), &oldelsz, &oldal);
         jl_value_t *ownerty = jl_typeof(owner);
-        size_t oldalign = (ownerty == (jl_value_t*)jl_string_type ? 1 : oldal);
-        if (oldalign < align)
-            jl_exceptionf(jl_argumenterror_type,
-                          "reinterpret from alignment %d bytes to alignment %d bytes not allowed",
-                          oldalign, align);
+        size_t oldelsz, oldalign;
+        if (ownerty == (jl_value_t*)jl_string_type) {
+            oldalign = 1;
+        }
+        else {
+            jl_islayout_inline(jl_tparam0(jl_typeof(data)), &oldelsz, &oldalign);
+        }
+        //FIXME: causes making Base to quit in io.jl
+        // if (oldalign < align)
+        //     jl_exceptionf(jl_argumenterror_type,
+        //                   "reinterpret from alignment %zu bytes to alignment %zu bytes not allowed",
+        //                   oldalign, align);
         a->flags.ptrarray = 0;
     }
     else {
