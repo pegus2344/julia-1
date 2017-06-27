@@ -5,16 +5,15 @@ mutable struct Set{T} <: AbstractSet{T}
 
     Set{T}() where {T} = new(Dict{T,Void}())
     Set{T}(itr) where {T} = union!(new(Dict{T,Void}()), itr)
+    Set{T}(itr...) where {T} = foldl(union!, Set{T}(), itr)
 end
 Set() = Set{Any}()
-Set(itr) = Set{eltype(itr)}(itr)
+Set(itr...) = Set{join_eltype(itr...)}(itr...)
 function Set(g::Generator)
     T = _default_eltype(typeof(g))
     (isleaftype(T) || T === Union{}) || return grow_to!(Set{T}(), g)
     return Set{T}(g)
 end
-
-(::Type{SetType})(elts...) where {SetType <: AbstractSet} = SetType(elts)
 
 eltype(::Type{Set{T}}) where {T} = T
 similar(s::Set{T}) where {T} = Set{T}()
