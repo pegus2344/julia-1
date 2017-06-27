@@ -124,6 +124,12 @@
 #define MACHINE_EXCLUSIVE_NAME          "JULIA_EXCLUSIVE"
 #define DEFAULT_MACHINE_EXCLUSIVE       0
 
+// threading infrastructure selection
+// comment the line below to enable the parallel task runtime
+#define JULIA_ENABLE_FORKJOIN_TI        1
+#ifndef JULIA_ENABLE_FORKJOIN_TI
+#define JULIA_ENABLE_PARTR              1
+#endif
 
 // sanitizer defaults ---------------------------------------------------------
 

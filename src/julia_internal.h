@@ -554,7 +554,6 @@ extern ssize_t jl_tls_offset;
 extern const int jl_tls_elf_support;
 void jl_init_threading(void);
 void jl_start_threads(void);
-void jl_shutdown_threading(void);
 
 // Whether the GC is running
 extern char *jl_safepoint_pages;
@@ -710,6 +709,45 @@ STATIC_INLINE char *jl_copy_str(char **to, const char *from)
 // timers
 // Returns time in nanosec
 JL_DLLEXPORT uint64_t jl_hrtime(void);
+
+#ifdef JULIA_ENABLE_PARTR
+// congruential random number generator
+STATIC_INLINE void seed_cong(uint64_t *seed)
+{
+    *seed = jl_hrtime();
+}
+STATIC_INLINE void unbias_cong(uint64_t max, uint64_t *unbias)
+{
+    *unbias = UINT64_MAX - ((UINT64_MAX % max)+1);
+}
+STATIC_INLINE uint64_t cong(uint64_t max, uint64_t unbias, uint64_t *seed)
+{
+    while ((*seed = 69069 * (*seed) + 362437) > unbias)
+        ;
+    return *seed % max;
+}
+
+// multiq
+void jl_multiq_init();
+int multiq_insert(ptask_t *elem, int16_t priority);
+ptask_t *multiq_deletemin();
+int16_t multiq_minprio();
+
+// sync trees
+typedef struct _arriver_t arriver_t;
+typedef struct _reducer_t reducer_t;
+
+/* interface */
+void synctreepool_init();
+void synctreepool_destroy();
+arriver_t *arriver_alloc();
+void arriver_free(arriver_t *);
+reducer_t *reducer_alloc();
+void reducer_free(reducer_t *);
+
+int last_arriver(arriver_t *, int);
+void *reduce(arriver_t *, reducer_t *, void *(*rf)(void *, void *), void *, int);
+#endif // JULIA_ENABLE_PARTR
 
 // libuv stuff:
 JL_DLLEXPORT extern void *jl_dl_handle;

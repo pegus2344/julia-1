@@ -39,9 +39,9 @@ SRCS := \
 	jltypes gf typemap ast builtins module interpreter symbol \
 	dlload sys init task array dump staticdata toplevel jl_uv datatype \
 	simplevector APInt-C runtime_intrinsics runtime_ccall precompile \
-	threadgroup threading stackwalk gc gc-debug gc-pages method \
-	jlapi signal-handling safepoint jloptions timing subtype rtutils \
-	crc32c
+	threadgroup threading forkjoin-ti partr multiq synctreepool \
+	stackwalk gc gc-debug gc-pages method jlapi signal-handling \
+	safepoint jloptions timing subtype rtutils crc32c
 
 ifeq ($(USEMSVC), 1)
 SRCS += getopt

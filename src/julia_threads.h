@@ -28,17 +28,17 @@
 #endif
 #include <signal.h>
 
-typedef struct {
-    jl_taggedvalue_t *freelist;   // root of list of free objects
-    jl_taggedvalue_t *newpages;   // root of list of chunks of free objects
-    uint16_t osize;      // size of objects in this pool
-} jl_gc_pool_t;
-
 // Recursive spin lock
 typedef struct {
     volatile unsigned long owner;
     uint32_t count;
 } jl_mutex_t;
+
+typedef struct {
+    jl_taggedvalue_t *freelist;   // root of list of free objects
+    jl_taggedvalue_t *newpages;   // root of list of chunks of free objects
+    uint16_t osize;      // size of objects in this pool
+} jl_gc_pool_t;
 
 typedef struct {
     // variable for tracking weak references
@@ -122,6 +122,12 @@ typedef struct _jl_tls_states_t {
     jl_jmp_buf base_ctx; // base context of stack
     jl_jmp_buf *safe_restore;
     int16_t tid;
+#ifdef JULIA_ENABLE_PARTR
+    uint64_t rngseed;
+    struct _jl_ptask_t *curr_task;
+    struct _jl_ptask_t **sticky_taskq;
+    struct int8_t *sticky_taskq_lock;
+#endif
     size_t bt_size;
     // JL_MAX_BT_SIZE + 1 elements long
     uintptr_t *bt_data;
@@ -223,11 +229,17 @@ static inline unsigned long JL_CONST_FUNC jl_thread_self(void)
     __sync_val_compare_and_swap(obj, expected, desired)
 #  define jl_atomic_exchange(obj, desired)              \
     __atomic_exchange_n(obj, desired, __ATOMIC_SEQ_CST)
+#  define jl_atomic_exchange_generic(obj, desired, orig)\
+    __atomic_exchange(obj, desired, orig, __ATOMIC_SEQ_CST)
 #  define jl_atomic_exchange_relaxed(obj, desired)      \
     __atomic_exchange_n(obj, desired, __ATOMIC_RELAXED)
 // TODO: Maybe add jl_atomic_compare_exchange_weak for spin lock
 #  define jl_atomic_store(obj, val)                     \
     __atomic_store_n(obj, val, __ATOMIC_SEQ_CST)
+#  define jl_atomic_clear(obj)                          \
+    __atomic_clear(obj, __ATOMIC_RELEASE)
+#  define jl_atomic_test_and_set(obj)                   \
+    __atomic_test_and_set(obj, __ATOMIC_ACQUIRE);
 #  if defined(__clang__) || defined(__ICC) || defined(__INTEL_COMPILER) || \
     !(defined(_CPU_X86_) || defined(_CPU_X86_64_))
 // ICC and Clang doesn't have this bug...
@@ -384,6 +396,7 @@ jl_atomic_exchange(volatile T *obj, T2 val)
 {
     return _InterlockedExchange64((volatile __int64*)obj, (__int64)val);
 }
+// TODO: jl_atomic_exchange_generic
 #define jl_atomic_exchange_relaxed(obj, val) jl_atomic_exchange(obj, val)
 // atomic stores
 template<typename T, typename T2>
@@ -409,6 +422,18 @@ static inline typename std::enable_if<sizeof(T) == 8>::type
 jl_atomic_store(volatile T *obj, T2 val)
 {
     _InterlockedExchange64((volatile __int64*)obj, (__int64)val);
+}
+template<typename T, typename T2>
+static inline typename std::enable_if<sizeof(T) == 1>::type
+jl_atomic_clear(volatile T *obj)
+{
+    _InterlockedExchange8((volatile char*)obj, (char)0);
+}
+template<typename T, typename T2>
+static inline typename std::enable_if<sizeof(T) == 1>::type
+jl_atomic_test_and_set(volatile T *obj)
+{
+    return _InterlockedExchange8((volatile char*)obj, (char)1);
 }
 template<typename T, typename T2>
 static inline void jl_atomic_store_release(volatile T *obj, T2 val)
@@ -440,7 +465,6 @@ extern "C" {
 #endif
 
 JL_DLLEXPORT int16_t jl_threadid(void);
-JL_DLLEXPORT void *jl_threadgroup(void);
 JL_DLLEXPORT void jl_threading_profile(void);
 JL_DLLEXPORT void (jl_cpu_pause)(void);
 JL_DLLEXPORT void (jl_cpu_wake)(void);
@@ -559,6 +583,22 @@ static inline void jl_mutex_lock(jl_mutex_t *lock)
     jl_mutex_wait(lock, 1);
     jl_lock_frame_push(lock);
     jl_gc_enable_finalizers(ptls, 0);
+}
+
+static inline int jl_mutex_trylock_nogc(jl_mutex_t *lock)
+{
+    unsigned long self = jl_thread_self();
+    unsigned long owner = jl_atomic_load_acquire(&lock->owner);
+    if (owner == self) {
+        lock->count++;
+        return 1;
+    }
+    if (owner == 0 &&
+        jl_atomic_compare_exchange(&lock->owner, 0, self) == 0) {
+        lock->count = 1;
+        return 1;
+    }
+    return 0;
 }
 
 /* Call this function for code that could be called from either a managed
