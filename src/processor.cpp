@@ -815,11 +815,8 @@ enum class CPU : uint32_t {
     // ARM
     // armv6l
     arm_mpcore,
-    arm_1136j_s,
     arm_1136jf_s,
-    arm_1156t2_s,
     arm_1156t2f_s,
-    arm_1176jz_s,
     arm_1176jzf_s,
     arm_cortex_m0,
     arm_cortex_m1,
@@ -904,6 +901,191 @@ enum class CPU : uint32_t {
     // armv7l
     intel_3735d,
 };
+
+}
+
+namespace AArch32 {
+using namespace ARM;
+
+static constexpr size_t feature_sz = 3;
+static constexpr FeatureName feature_names[] = {
+#define AArch32_FEATURE_DEF(name, bit, llvmver) {#name, bit, llvmver},
+#include "features_aarch32.h"
+#undef AArch32_FEATURE_DEF
+};
+static constexpr uint32_t nfeature_names = sizeof(feature_names) / sizeof(FeatureName);
+
+template<typename... Args>
+static inline constexpr FeatureList<feature_sz> get_feature_masks(Args... args)
+{
+    return ::get_feature_masks<feature_sz>(args...);
+}
+
+static constexpr auto feature_masks = get_feature_masks(
+#define AArch32_FEATURE_DEF(name, bit, llvmver) bit,
+#include "features_aarch32.h"
+#undef AArch32_FEATURE_DEF
+    -1);
+
+namespace Feature {
+enum : uint32_t {
+#define AArch32_FEATURE_DEF(name, bit, llvmver) name = bit,
+#include "features_aarch32.h"
+#undef AArch32_FEATURE_DEF
+};
+static constexpr FeatureDep deps[] = {
+    {neon, vfp3},
+    {vfp4, vfp3},
+    {crypto, neon},
+    {v7a, v7},
+    {v7r, v7},
+    {v7r, hwdiv},
+    {v8, neon},
+    {v8, vfp4},
+    {v8, d32},
+    {v8, hwdiv},
+    {v8a, hwdiv_arm},
+    {v8a, v8},
+    {v8r, v8},
+    {v8_1a, v8a},
+    {v8_2a, v8_1a},
+};
+
+// Some of these can be simplified in c++14 by reusing the common part
+// since `[]` on `std::array` is constexpr.
+
+constexpr auto generic = get_feature_masks();
+// armv7ml
+constexpr auto armv7m = get_feature_masks(v7, hwdiv);
+constexpr auto arm_cortex_m3 = armv7m;
+constexpr auto arm_cortex_m4 = armv7m;
+constexpr auto arm_cortex_m7 = armv7m;
+// armv7l
+constexpr auto arm_cortex_a5 = get_feature_masks(v7, v7a);
+constexpr auto arm_cortex_a7 = get_feature_masks(v7, v7a, vfp3, vfp4, neon);
+constexpr auto arm_cortex_a8 = get_feature_masks(v7, v7a, d32, vfp3, neon);
+constexpr auto arm_cortex_a9 = get_feature_masks(v7, v7a);
+constexpr auto arm_cortex_a12 = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon);
+constexpr auto arm_cortex_a15 = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon);
+constexpr auto arm_cortex_a17 = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon);
+constexpr auto arm_cortex_r4 = get_feature_masks(v7, v7r, vfp3, hwdiv);
+constexpr auto arm_cortex_r5 = get_feature_masks(v7, v7r, vfp3, hwdiv, hwdiv_arm);
+constexpr auto arm_cortex_r7 = get_feature_masks(v7, v7r, vfp3, hwdiv, hwdiv_arm);
+constexpr auto arm_cortex_r8 = get_feature_masks(v7, v7r, vfp3, hwdiv, hwdiv_arm);
+constexpr auto qualcomm_scorpion = get_feature_masks(v7, v7a, vfp3, neon);
+constexpr auto qualcomm_krait = get_feature_masks(v7, v7a, vfp3, vfp4, neon, hwdiv, hwdiv_arm);
+constexpr auto apple_swift = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon, hwdiv, hwdiv_arm);
+constexpr auto marvell_pj4 = get_feature_masks(v7, v7a, vfp3);
+constexpr auto intel_3735d = get_feature_masks(v7, v7a, vfp3, neon);
+// armv8ml
+constexpr auto arm_cortex_m23 = get_feature_masks(v8, neon, vfp3, vfp4, d32, hwdiv);
+constexpr auto arm_cortex_m33 = get_feature_masks(v8, neon, vfp3, vfp4, d32, hwdiv);
+// armv8l
+constexpr auto arm_cortex_a32 = get_feature_masks(v8, v8a, neon, vfp3, vfp4, d32,
+                                                  hwdiv, hwdiv_arm);
+constexpr auto arm_cortex_r52 = get_feature_masks(v8, v8r, neon, vfp3, vfp4, d32,
+                                                  hwdiv, hwdiv_arm);
+// aarch64
+constexpr auto arm_cortex_a35 = get_feature_masks(v8, v8a, neon, vfp3, vfp4, d32,
+                                                  hwdiv, hwdiv_arm);
+constexpr auto arm_cortex_a53 = get_feature_masks();
+constexpr auto arm_cortex_a57 = get_feature_masks();
+constexpr auto arm_cortex_a72 = get_feature_masks();
+constexpr auto arm_cortex_a73 = get_feature_masks();
+constexpr auto cavium_thunderx2t99p1 = get_feature_masks();
+constexpr auto cavium_thunderx = get_feature_masks();
+constexpr auto cavium_thunderx88 = get_feature_masks();
+constexpr auto cavium_thunderx88p1 = get_feature_masks();
+constexpr auto cavium_thunderx81 = get_feature_masks();
+constexpr auto cavium_thunderx83 = get_feature_masks();
+constexpr auto cavium_thunderx2t99 = get_feature_masks();
+constexpr auto nvidia_denver1 = get_feature_masks();
+constexpr auto nvidia_denver2 = get_feature_masks();
+constexpr auto apm_xgene1 = get_feature_masks();
+constexpr auto apm_xgene2 = get_feature_masks();
+constexpr auto apm_xgene3 = get_feature_masks();
+constexpr auto qualcomm_kyro = get_feature_masks();
+constexpr auto qualcomm_falkor = get_feature_masks();
+constexpr auto samsung_exynos_m1 = get_feature_masks();
+constexpr auto samsung_exynos_m2 = get_feature_masks();
+constexpr auto samsung_exynos_m3 = get_feature_masks();
+constexpr auto apple_cyclone = get_feature_masks();
+constexpr auto apple_typhoon = get_feature_masks();
+constexpr auto apple_twister = get_feature_masks();
+constexpr auto apple_hurricane = get_feature_masks();
+
+}
+
+static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
+    {"generic", CPU::generic, CPU::generic, 0, Feature::generic},
+    // armv6
+    {"armv6", CPU::generic, CPU::generic, 0, Feature::generic},
+    {"mpcore", CPU::generic, CPU::generic, 0, Feature::generic},
+    {"arm1136jf-s", CPU::generic, CPU::generic, 0, Feature::generic},
+    {"arm1156t2f-s", CPU::generic, CPU::generic, 0, Feature::generic},
+    {"arm1176jzf-s", CPU::generic, CPU::generic, 0, Feature::generic},
+    {"cortex-m0", CPU::generic, CPU::generic, 0, Feature::generic},
+    {"cortex-m1", CPU::generic, CPU::generic, 0, Feature::generic},
+    // armv7ml
+    // constexpr auto armv7m = get_feature_masks(v7, hwdiv);
+    // constexpr auto arm_cortex_m3 = armv7m;
+    // constexpr auto arm_cortex_m4 = armv7m;
+    // constexpr auto arm_cortex_m7 = armv7m;
+// // armv7l
+// constexpr auto arm_cortex_a5 = get_feature_masks(v7, v7a);
+// constexpr auto arm_cortex_a7 = get_feature_masks(v7, v7a, vfp3, vfp4, neon);
+// constexpr auto arm_cortex_a8 = get_feature_masks(v7, v7a, d32, vfp3, neon);
+// constexpr auto arm_cortex_a9 = get_feature_masks(v7, v7a);
+// constexpr auto arm_cortex_a12 = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon);
+// constexpr auto arm_cortex_a15 = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon);
+// constexpr auto arm_cortex_a17 = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon);
+// constexpr auto arm_cortex_r4 = get_feature_masks(v7, v7r, vfp3, hwdiv);
+// constexpr auto arm_cortex_r5 = get_feature_masks(v7, v7r, vfp3, hwdiv, hwdiv_arm);
+// constexpr auto arm_cortex_r7 = get_feature_masks(v7, v7r, vfp3, hwdiv, hwdiv_arm);
+// constexpr auto arm_cortex_r8 = get_feature_masks(v7, v7r, vfp3, hwdiv, hwdiv_arm);
+// constexpr auto qualcomm_scorpion = get_feature_masks(v7, v7a, vfp3, neon);
+// constexpr auto qualcomm_krait = get_feature_masks(v7, v7a, vfp3, vfp4, neon, hwdiv, hwdiv_arm);
+// constexpr auto apple_swift = get_feature_masks(v7, v7a, d32, vfp3, vfp4, neon, hwdiv, hwdiv_arm);
+// constexpr auto marvell_pj4 = get_feature_masks(v7, v7a, vfp3);
+// constexpr auto intel_3735d = get_feature_masks(v7, v7a, vfp3, neon);
+// // armv8ml
+// constexpr auto arm_cortex_m23 = get_feature_masks(v8, neon, vfp3, vfp4, d32, hwdiv);
+// constexpr auto arm_cortex_m33 = get_feature_masks(v8, neon, vfp3, vfp4, d32, hwdiv);
+// // armv8l
+// constexpr auto arm_cortex_a32 = get_feature_masks(v8, v8a, neon, vfp3, vfp4, d32,
+//                                                   hwdiv, hwdiv_arm);
+// constexpr auto arm_cortex_r52 = get_feature_masks(v8, v8r, neon, vfp3, vfp4, d32,
+//                                                   hwdiv, hwdiv_arm);
+// // aarch64
+// constexpr auto arm_cortex_a35 = get_feature_masks(v8, v8a, neon, vfp3, vfp4, d32,
+//                                                   hwdiv, hwdiv_arm);
+// constexpr auto arm_cortex_a53 = get_feature_masks();
+// constexpr auto arm_cortex_a57 = get_feature_masks();
+// constexpr auto arm_cortex_a72 = get_feature_masks();
+// constexpr auto arm_cortex_a73 = get_feature_masks();
+// constexpr auto cavium_thunderx2t99p1 = get_feature_masks();
+// constexpr auto cavium_thunderx = get_feature_masks();
+// constexpr auto cavium_thunderx88 = get_feature_masks();
+// constexpr auto cavium_thunderx88p1 = get_feature_masks();
+// constexpr auto cavium_thunderx81 = get_feature_masks();
+// constexpr auto cavium_thunderx83 = get_feature_masks();
+// constexpr auto cavium_thunderx2t99 = get_feature_masks();
+// constexpr auto nvidia_denver1 = get_feature_masks();
+// constexpr auto nvidia_denver2 = get_feature_masks();
+// constexpr auto apm_xgene1 = get_feature_masks();
+// constexpr auto apm_xgene2 = get_feature_masks();
+// constexpr auto apm_xgene3 = get_feature_masks();
+// constexpr auto qualcomm_kyro = get_feature_masks();
+// constexpr auto qualcomm_falkor = get_feature_masks();
+// constexpr auto samsung_exynos_m1 = get_feature_masks();
+// constexpr auto samsung_exynos_m2 = get_feature_masks();
+// constexpr auto samsung_exynos_m3 = get_feature_masks();
+// constexpr auto apple_cyclone = get_feature_masks();
+// constexpr auto apple_typhoon = get_feature_masks();
+// constexpr auto apple_twister = get_feature_masks();
+// constexpr auto apple_hurricane = get_feature_masks();
+};
+static constexpr size_t ncpu_names = sizeof(cpus) / sizeof(cpus[0]);
 
 }
 
