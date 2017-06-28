@@ -3766,7 +3766,7 @@ end
 # `TypeVar`) without crashing
 let
     function arrayset_unknown_dim{T}(::Type{T}, n)
-        Base.arrayset(reshape(Vector{T}(1), ones(Int, n)...), 2, 1)
+        Core.arrayset(true, reshape(Vector{T}(1), ones(Int, n)...), 2, 1)
     end
     arrayset_unknown_dim(Any, 1)
     arrayset_unknown_dim(Any, 2)
@@ -3958,16 +3958,13 @@ end
 
 function metadata_matches(ast::CodeInfo)
     inbounds_cnt = Ref(0)
-    boundscheck_cnt = Ref(0)
     for ex in ast.code::Array{Any,1}
         if isa(ex, Expr)
             ex = ex::Expr
             count_expr_push(ex, :inbounds, inbounds_cnt)
-            count_expr_push(ex, :boundscheck, boundscheck_cnt)
         end
     end
     @test inbounds_cnt[] == 0
-    @test boundscheck_cnt[] == 0
 end
 
 function test_metadata_matches(f::ANY, tt::ANY)
@@ -3983,14 +3980,9 @@ function f2()
     end
 end
 # No, don't write code this way...
-@eval function f3()
-    a = $(Expr(:boundscheck, true))
-    return 1
-    b = $(Expr(:boundscheck, :pop))
-end
 @noinline function g(a)
 end
-@eval function f4()
+@eval function f3()
     g($(Expr(:inbounds, true)))
     @goto out
     g($(Expr(:inbounds, :pop)))
@@ -4000,7 +3992,6 @@ end
 test_metadata_matches(f1, Tuple{})
 test_metadata_matches(f2, Tuple{})
 test_metadata_matches(f3, Tuple{})
-test_metadata_matches(f4, Tuple{})
 
 end
 

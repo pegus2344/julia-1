@@ -563,7 +563,6 @@ public:
     Value *world_age_field;
 
     bool debug_enabled;
-    bool is_inbounds{false};
 
     const jl_cgparams_t *params;
 
@@ -1957,7 +1956,7 @@ static jl_value_t *static_eval(jl_value_t *ex, jl_codectx_t *ctx, int sparams=tr
         if (e->head == call_sym) {
             jl_value_t *f = static_eval(jl_exprarg(e, 0), ctx, sparams, allow_alloc);
             if (f) {
-                if (jl_array_dim0(e->args) == 3 && f==jl_builtin_getfield) {
+                if (jl_array_dim0(e->args) == 3 && f == jl_builtin_getfield) {
                     m = (jl_module_t*)static_eval(jl_exprarg(e, 1), ctx, sparams, allow_alloc);
                     // Check the tag before evaluating `s` so that a value of random
                     // type won't be corrupted.
@@ -2124,10 +2123,10 @@ static void simple_escape_analysis(jl_value_t *expr, bool esc, jl_codectx_t *ctx
                         esc = false;
                     }
                     else {
-                        if ((fv==jl_builtin_getfield && alen==3 &&
-                             expr_type(jl_exprarg(e,2),ctx) == (jl_value_t*)jl_long_type) ||
-                            fv==jl_builtin_nfields ||
-                            (fv==jl_builtin__apply && alen==3)) {
+                        if ((fv == jl_builtin_getfield && (alen == 3 || alen == 4) &&
+                             expr_type(jl_exprarg(e, 2), ctx) == (jl_value_t*)jl_long_type) ||
+                            fv == jl_builtin_nfields ||
+                            (fv == jl_builtin__apply && alen == 3)) {
                             esc = false;
                         }
                     }
@@ -2135,7 +2134,7 @@ static void simple_escape_analysis(jl_value_t *expr, bool esc, jl_codectx_t *ctx
             }
 
             for (i = 1; i < (size_t)alen; i++) {
-                simple_escape_analysis(jl_exprarg(e,i), esc, ctx);
+                simple_escape_analysis(jl_exprarg(e, i), esc, ctx);
             }
         }
         else if (e->head == foreigncall_sym) {
@@ -2608,10 +2607,10 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
         }
     }
 
-    else if (f==jl_builtin_arrayref && nargs>=2) {
-        jl_value_t *aty = expr_type(args[1], ctx); rt1 = aty;
+    else if (f == jl_builtin_arrayref && nargs >= 3) {
+        jl_value_t *aty = expr_type(args[2], ctx); rt2 = aty;
         bool indexes_ok = true;
-        for (size_t i=2; i <= nargs; i++) {
+        for (size_t i = 3; i <= nargs; i++) {
             if (expr_type(args[i], ctx) != (jl_value_t*)jl_long_type) {
                 indexes_ok = false;
                 break;
@@ -2624,19 +2623,20 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
                 if (!jl_array_store_unboxed(ety))
                     ety = (jl_value_t*)jl_any_type;
                 jl_value_t *ndp = jl_tparam1(aty_dt);
-                if (jl_is_long(ndp) || nargs==2) {
-                    jl_cgval_t ary = emit_expr(args[1], ctx);
+                if (jl_is_long(ndp) || nargs == 3) {
+                    jl_cgval_t ary = emit_expr(args[2], ctx);
                     ssize_t nd = jl_is_long(ndp) ? jl_unbox_long(ndp) : -1;
-                    Value *idx = emit_array_nd_index(ary, args[1], nd, &args[2], nargs-1, ctx);
-                    if (jl_array_store_unboxed(ety) &&
-                        jl_datatype_size(ety) == 0) {
+                    Value *idx = emit_array_nd_index(ary, args[2], nd, &args[3], nargs - 2, args[1], ctx);
+                    if (jl_array_store_unboxed(ety) && jl_datatype_size(ety) == 0) {
                         assert(jl_is_datatype(ety));
                         assert(((jl_datatype_t*)ety)->instance != NULL);
                         *ret = ghostValue(ety);
                     }
                     else {
-                        *ret = typed_load(emit_arrayptr(ary, args[1], ctx), idx, ety, ctx,
-                            jl_array_store_unboxed(ety) ? tbaa_arraybuf : tbaa_ptrarraybuf);
+                        *ret = typed_load(
+                                emit_arrayptr(ary, args[2], ctx),
+                                idx, ety, ctx,
+                                jl_array_store_unboxed(ety) ? tbaa_arraybuf : tbaa_ptrarraybuf);
                     }
                     JL_GC_POP();
                     return true;
@@ -2645,11 +2645,11 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
         }
     }
 
-    else if (f==jl_builtin_arrayset && nargs>=3) {
-        jl_value_t *aty = expr_type(args[1], ctx); rt1 = aty;
-        jl_value_t *vty = expr_type(args[2], ctx); rt2 = vty;
+    else if (f == jl_builtin_arrayset && nargs >= 4) {
+        jl_value_t *aty = expr_type(args[2], ctx); rt1 = aty;
+        jl_value_t *vty = expr_type(args[3], ctx); rt2 = vty;
         bool indexes_ok = true;
-        for (size_t i=3; i <= nargs; i++) {
+        for (size_t i = 4; i <= nargs; i++) {
             if (expr_type(args[i], ctx) != (jl_value_t*)jl_long_type) {
                 indexes_ok = false;
                 break;
@@ -2663,17 +2663,17 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
                 if (isboxed)
                     ety = (jl_value_t*)jl_any_type;
                 jl_value_t *ndp = jl_tparam1(aty_dt);
-                if (jl_is_long(ndp) || nargs==3) {
-                    jl_cgval_t ary = emit_expr(args[1], ctx);
+                if (jl_is_long(ndp) || nargs == 4) {
+                    jl_cgval_t ary = emit_expr(args[2], ctx);
                     ssize_t nd = jl_is_long(ndp) ? jl_unbox_long(ndp) : -1;
-                    Value *idx = emit_array_nd_index(ary, args[1], nd, &args[3], nargs-2, ctx);
+                    Value *idx = emit_array_nd_index(ary, args[2], nd, &args[4], nargs - 3, args[1], ctx);
                     if (!isboxed && jl_datatype_size(ety) == 0) {
                         // no-op, but emit expr for possible effects
                         assert(jl_is_datatype(ety));
-                        emit_expr(args[2], ctx);
+                        emit_expr(args[3], ctx);
                     }
                     else {
-                        jl_cgval_t v = emit_expr(args[2], ctx);
+                        jl_cgval_t v = emit_expr(args[3], ctx);
                         PHINode *data_owner = NULL; // owner object against which the write barrier must check
                         if (isboxed) { // if not boxed we don't need a write barrier
                             assert(ary.isboxed);
@@ -2708,9 +2708,12 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
                             data_owner->addIncoming(aryv, curBB);
                             data_owner->addIncoming(own_ptr, ownedBB);
                         }
-                        typed_store(emit_arrayptr(ary,args[1],ctx,isboxed), idx, v,
-                                    ety, ctx, !isboxed ? tbaa_arraybuf : tbaa_ptrarraybuf, data_owner, 0,
-                                    false); // don't need to root the box if we had to make one since it's being stored in the array immediatly
+                        typed_store(
+                                emit_arrayptr(ary, args[2], ctx, isboxed),
+                                idx, v, ety, ctx,
+                                !isboxed ? tbaa_arraybuf : tbaa_ptrarraybuf,
+                                data_owner, 0,
+                                false); // don't need to root the box if we had to make one since it's being stored in the array immediatly
                     }
                     *ret = ary;
                     JL_GC_POP();
@@ -2720,10 +2723,10 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
         }
     }
 
-    else if (f==jl_builtin_getfield && nargs==2) {
-        if (jl_is_quotenode(args[2]) && jl_is_symbol(jl_fieldref(args[2],0))) {
+    else if (f == jl_builtin_getfield && (nargs == 2 || nargs == 3)) {
+        if (jl_is_quotenode(args[2]) && jl_is_symbol(jl_fieldref(args[2], 0))) {
             *ret = emit_getfield(args[1],
-                                 (jl_sym_t*)jl_fieldref(args[2],0), ctx);
+                                 (jl_sym_t*)jl_fieldref(args[2], 0), ctx);
             if (ret->typ == (jl_value_t*)jl_any_type) // improve the type, if known from the expr
                 *ret = update_julia_type(*ret, expr_type(expr, ctx), ctx);
             JL_GC_POP();
@@ -2737,7 +2740,9 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
             Value *idx = emit_unbox(T_size, emit_expr(args[2], ctx), fldt);
             idx = emit_bounds_check(
                     jl_cgval_t(builder.CreateGEP(ctx->argArray, ConstantInt::get(T_size, ctx->nReqArgs)), NULL, false, NULL, NULL),
-                    NULL, idx, valen, ctx);
+                    NULL, idx, valen,
+                    nargs == 3 ? args[3] : jl_true,
+                    ctx);
             idx = builder.CreateAdd(idx, ConstantInt::get(T_size, ctx->nReqArgs));
             *ret = mark_julia_type(
                 tbaa_decorate(tbaa_value, builder.CreateLoad(builder.CreateGEP(ctx->argArray, idx))),
@@ -2764,7 +2769,8 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
                 else {
                     // unknown index
                     Value *vidx = emit_unbox(T_size, emit_expr(args[2], ctx), (jl_value_t*)jl_long_type);
-                    if (emit_getfield_unknownidx(ret, strct, vidx, (jl_datatype_t*)utt, ctx)) {
+                    jl_value_t *boundscheck = (nargs == 3 ? args[3] : jl_true);
+                    if (emit_getfield_unknownidx(ret, strct, vidx, (jl_datatype_t*)utt, boundscheck, ctx)) {
                         if (ret->typ == (jl_value_t*)jl_any_type) // improve the type, if known from the expr
                             ret->typ = expr_type(expr, ctx);
                         JL_GC_POP();
@@ -2785,13 +2791,16 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
                     if (jl_is_vararg_type(jt))
                         jt = jl_unwrap_vararg(jt);
                     Value *vidx = emit_unbox(T_size, emit_expr(args[2], ctx), (jl_value_t*)jl_long_type);
-                    // This is not necessary for correctness, but allows to omit
+                    // This branch is not necessary semantically, but allows omitting
                     // the extra code for getting the length of the tuple
-                    if (!bounds_check_enabled(ctx)) {
+                    jl_cgval_t boundscheck = emit_expr(nargs == 3 ? args[3] : jl_true, ctx);
+                    if (!bounds_check_enabled(ctx, boundscheck.constant)) {
                         vidx = builder.CreateSub(vidx, ConstantInt::get(T_size, 1));
                     } else {
-                        vidx = emit_bounds_check(strct, (jl_value_t*)stt, vidx,
-                            emit_datatype_nfields(emit_typeof_boxed(strct, ctx)), ctx);
+                        vidx = emit_bounds_check(
+                                strct, (jl_value_t*)stt, vidx,
+                                emit_datatype_nfields(emit_typeof_boxed(strct, ctx)),
+                                jl_true, ctx);
                     }
                     Value *ptr = data_pointer(strct, ctx);
                     *ret = typed_load(ptr, vidx, jt, ctx, strct.tbaa, false);
@@ -2873,7 +2882,7 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
         }
     }
 
-    else if (f==jl_builtin_fieldtype && nargs==2) {
+    else if (f == jl_builtin_fieldtype && (nargs == 2 || nargs == 3)) {
         jl_datatype_t *sty = (jl_datatype_t*)expr_type(args[1], ctx);
         rt1 = (jl_value_t*)sty;
         if (jl_is_type_type((jl_value_t*)sty) || sty == jl_datatype_type) {
@@ -2885,7 +2894,8 @@ static bool emit_builtin_call(jl_cgval_t *ret, jl_value_t *f, jl_value_t **args,
                 Value *types_svec = emit_datatype_types(tyv);
                 Value *types_len = emit_datatype_nfields(tyv);
                 Value *idx = emit_unbox(T_size, emit_expr(args[2], ctx), (jl_value_t*)jl_long_type);
-                emit_bounds_check(ty, (jl_value_t*)jl_datatype_type, idx, types_len, ctx);
+                jl_value_t *boundscheck = (nargs == 3 ? args[3] : jl_true);
+                emit_bounds_check(ty, (jl_value_t*)jl_datatype_type, idx, types_len, boundscheck, ctx);
                 Value *fieldtyp = tbaa_decorate(tbaa_const, builder.CreateLoad(builder.CreateGEP(decay_derived(emit_bitcast(types_svec, T_pprjlvalue)), idx)));
                 *ret = mark_julia_type(fieldtyp, true, expr_type(expr, ctx), ctx);
                 JL_GC_POP();
@@ -3886,8 +3896,7 @@ static void emit_stmtpos(jl_value_t *expr, jl_codectx_t *ctx)
     jl_expr_t *ex = (jl_expr_t*)expr;
     jl_value_t **args = (jl_value_t**)jl_array_data(ex->args);
     jl_sym_t *head = ex->head;
-    if (head == line_sym || head == meta_sym || head == boundscheck_sym ||
-        head == inbounds_sym) {
+    if (head == line_sym || head == meta_sym || head == inbounds_sym) {
         // some expression types are metadata and can be ignored
         // in statement position
         return;
@@ -4120,7 +4129,7 @@ static jl_cgval_t emit_expr(jl_value_t *expr, jl_codectx_t *ctx)
         jl_error("Expr(:inbounds) in value position");
     }
     else if (head == boundscheck_sym) {
-        jl_error("Expr(:boundscheck) in value position");
+        return mark_julia_const(bounds_check_enabled(ctx, jl_true) ? jl_true : jl_false);
     }
     else {
         if (!strcmp(jl_symbol_name(head), "$"))
@@ -5567,24 +5576,14 @@ static std::unique_ptr<Module> emit_function(
         DebugLoc loc;
         StringRef file;
         ssize_t line;
-        bool is_inbounds;
         bool loc_changed;
         bool is_poploc;
         bool in_user_code;
     };
     std::vector<StmtProp> stmtprops(stmtslen);
     std::vector<DbgState> DI_stack;
-    std::vector<bool> inbounds_stack{false};
-    auto is_inbounds = [&] () {
-        // inbounds rule is either of top two values on inbounds stack are true
-        size_t sz = inbounds_stack.size();
-        bool inbounds = sz && inbounds_stack.back();
-        if (sz > 1)
-            inbounds |= inbounds_stack[sz - 2];
-        return inbounds;
-    };
     StmtProp cur_prop{topdebugloc, filename, toplineno,
-            false, true, false, false};
+            true, false, false};
     ctx.line = &cur_prop.line;
     if (coverage_mode != JL_LOG_NONE || malloc_log_mode) {
         cur_prop.in_user_code = (!jl_is_submodule(ctx.module, jl_base_module) &&
@@ -5691,29 +5690,9 @@ static std::unique_ptr<Module> emit_function(
                 cur_prop.loc_changed = true;
             }
         }
-        if (expr) {
-            jl_value_t **args = (jl_value_t**)jl_array_data(expr->args);
-            if (expr->head == inbounds_sym) {
-                // manipulate inbounds stack
-                if (jl_array_len(expr->args) > 0) {
-                    jl_value_t *arg = args[0];
-                    if (arg == jl_true) {
-                        inbounds_stack.push_back(true);
-                    }
-                    else if (arg == jl_false) {
-                        inbounds_stack.push_back(false);
-                    }
-                    else if (!inbounds_stack.empty()) {
-                        inbounds_stack.pop_back();
-                    }
-                }
-            }
-        }
-        cur_prop.is_inbounds = is_inbounds();
         stmtprops[i] = cur_prop;
     }
     DI_stack.clear();
-    inbounds_stack.clear();
 
     // step 12. Do codegen in control flow order
     std::vector<std::pair<int,BasicBlock*>> workstack;
@@ -5816,7 +5795,6 @@ static std::unique_ptr<Module> emit_function(
             !props.is_poploc) {
             coverageVisitLine(props.file, props.line);
         }
-        ctx.is_inbounds = props.is_inbounds;
         jl_value_t *stmt = jl_array_ptr_ref(stmts, cursor);
         jl_expr_t *expr = jl_is_expr(stmt) ? (jl_expr_t*)stmt : nullptr;
         if (jl_is_labelnode(stmt)) {
