@@ -22,36 +22,38 @@ BunchKaufman(A::AbstractMatrix{T}, ipiv::Vector{BlasInt}, uplo::Char, symmetric:
 `bkfact!` is the same as [`bkfact`](@ref), but saves space by overwriting the
 input `A`, instead of creating a copy.
 """
-function bkfact!(A::StridedMatrix{<:BlasReal}, uplo::Symbol = :U,
-    symmetric::Bool = issymmetric(A), rook::Bool = false)
-
-    if !symmetric
-        throw(ArgumentError("Bunch-Kaufman decomposition is only valid for symmetric matrices"))
-    end
+function bkfact!(A::HermOrSym{T,S} where {T<:BlasReal,S<:StridedMatrix{T}}, rook::Bool = false)
     if rook
-        LD, ipiv, info = LAPACK.sytrf_rook!(char_uplo(uplo), A)
+        LD, ipiv, info = LAPACK.sytrf_rook!(A.uplo, A.data)
     else
-        LD, ipiv, info = LAPACK.sytrf!(char_uplo(uplo), A)
+        LD, ipiv, info = LAPACK.sytrf!(A.uplo, A.data)
     end
-    BunchKaufman(LD, ipiv, char_uplo(uplo), symmetric, rook, info)
+    BunchKaufman(LD, ipiv, A.uplo, true, rook, info)
 end
-function bkfact!(A::StridedMatrix{<:BlasComplex}, uplo::Symbol=:U,
-    symmetric::Bool=issymmetric(A), rook::Bool=false)
-
+function bkfact!(A::Symmetric{T,S} where {T<:BlasComplex,S<:StridedMatrix{T}}, rook::Bool = false)
     if rook
-        if symmetric
-            LD, ipiv, info = LAPACK.sytrf_rook!(char_uplo(uplo), A)
-        else
-            LD, ipiv, info = LAPACK.hetrf_rook!(char_uplo(uplo), A)
-        end
+        LD, ipiv, info = LAPACK.sytrf_rook!(A.uplo, A.data)
     else
-        if symmetric
-            LD, ipiv, info = LAPACK.sytrf!(char_uplo(uplo),  A)
-        else
-            LD, ipiv, info = LAPACK.hetrf!(char_uplo(uplo), A)
-        end
+        LD, ipiv, info = LAPACK.sytrf!(A.uplo, A.data)
     end
-    BunchKaufman(LD, ipiv, char_uplo(uplo), symmetric, rook, info)
+    BunchKaufman(LD, ipiv, A.uplo, true, rook, info)
+end
+function bkfact!(A::Hermitian{T,S} where {T<:BlasComplex,S<:StridedMatrix{T}}, rook::Bool = false)
+    if rook
+        LD, ipiv, info = LAPACK.hetrf_rook!(A.uplo, A.data)
+    else
+        LD, ipiv, info = LAPACK.hetrf!(A.uplo, A.data)
+    end
+    BunchKaufman(LD, ipiv, A.uplo, false, rook, info)
+end
+function bkfact!(A::StridedMatrix{<:BlasFloat}, rook::Bool = false)
+    if ishermitian(A)
+        return bkfact!(Hermitian(A), rook)
+    elseif issymmetric(A)
+        return bkfact!(Symmetric(A), rook)
+    else
+        throw(ArgumentError("Bunch-Kaufman decomposition is only valid for symmetric or Hermitian matrices"))
+    end
 end
 
 """
@@ -69,13 +71,8 @@ The following functions are available for
 [^Bunch1977]: J R Bunch and L Kaufman, Some stable methods for calculating inertia and solving symmetric linear systems, Mathematics of Computation 31:137 (1977), 163-179. [url](http://www.ams.org/journals/mcom/1977-31-137/S0025-5718-1977-0428694-0/).
 
 """
-bkfact(A::StridedMatrix{<:BlasFloat}, uplo::Symbol=:U, symmetric::Bool=issymmetric(A),
-    rook::Bool=false) =
-        bkfact!(copy(A), uplo, symmetric, rook)
-bkfact(A::StridedMatrix{T}, uplo::Symbol=:U, symmetric::Bool=issymmetric(A),
-    rook::Bool=false) where {T} =
-        bkfact!(convert(Matrix{promote_type(Float32, typeof(sqrt(one(T))))}, A),
-                uplo, symmetric, rook)
+bkfact(A::AbstractMatrix{T}, rook::Bool=false) where {T} =
+    bkfact!(copy_oftype(A, typeof(sqrt(one(T)))), rook)
 
 convert(::Type{BunchKaufman{T}}, B::BunchKaufman{T}) where {T} = B
 convert(::Type{BunchKaufman{T}}, B::BunchKaufman) where {T} =
